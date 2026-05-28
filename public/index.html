@@ -311,6 +311,268 @@ async function doLogout(){
   showLogin();
 }
 
+
+// ═══════════════════════════════════════════════
+// HELPERS CRUD GLOBAUX
+// ═══════════════════════════════════════════════
+
+// Oui/Non toggle badge cliquable
+function ouiBadge(val, key, id, entity) {
+  const ok = val==='OUI';
+  const bg = ok?'var(--t5bg)':'rgba(239,68,68,.1)';
+  const c  = ok?'var(--t5c)':'#ef4444';
+  return `<span class="badge tog-badge" style="background:${bg};color:${c};cursor:pointer" data-entity="${entity}" data-id="${id}" data-key="${key}" data-val="${val}">${val}</span>`;
+}
+
+// Modal générique pour créer/éditer un BUS
+function openBusForm(bus) {
+  const isEdit = !!bus;
+  const mo = document.getElementById('mo-overlay');
+  mo.className = 'open';
+  mo.innerHTML = `<div class="modal" style="max-width:600px">
+    <div class="modal-hdr">
+      <div style="font-size:17px;font-weight:700;color:#fff">${isEdit?'Modifier le BUS':'Nouveau BUS'}</div>
+      <button id="closeBusForm" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="busFormErr" style="display:none;padding:10px 14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:#ef4444;font-size:13px;margin-bottom:14px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="grid-column:1/-1">
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">Nom topologie <span style="color:#ef4444">*</span></div>
+          <input id="bf_id" placeholder="38_73_BUS_3001" value="${esc(bus?.id||'')}" ${isEdit?'readonly style="opacity:.6"':''} style="width:100%">
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">Lot <span style="color:#ef4444">*</span></div>
+          <select id="bf_lot" style="width:100%">
+            ${['LOT1','LOT2','LOT3'].map(l=>`<option${bus?.lot===l?' selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">DOR</div>
+          <select id="bf_dor" style="width:100%">
+            ${['','NO','NE','SE','SO','O'].map(d=>`<option value="${d}"${bus?.dor===d?' selected':''}>${d||'–'}</option>`).join('')}
+          </select>
+        </div>
+        <div style="grid-column:1/-1">
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">Extrémités</div>
+          <input id="bf_ext" placeholder="Ville A ; Ville B" value="${esc(bus?.ext||'')}" style="width:100%">
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">État</div>
+          <select id="bf_etat" style="width:100%">
+            ${Object.entries(SC).map(([k,v])=>`<option value="${k}"${bus?.etat==k?' selected':''}>${v.s}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">Avancement (%)</div>
+          <input id="bf_av" type="number" min="0" max="100" value="${bus?.av??0}" style="width:100%">
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">RR</div>
+          <input id="bf_rr" placeholder="NOM Prénom" value="${esc(bus?.rr||'')}" style="width:100%">
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">Risque</div>
+          <select id="bf_risque" style="width:100%">
+            ${['Faible','Moyen','Élevé'].map(r=>`<option${bus?.risque===r?' selected':''}>${r}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">Livraison prévisionnelle</div>
+          <input id="bf_liv" placeholder="2026-S32" value="${esc(bus?.liv||'')}" style="width:100%">
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">MES prévisionnelle</div>
+          <input id="bf_mes" placeholder="2026-S36" value="${esc(bus?.mes||'')}" style="width:100%">
+        </div>
+        <div style="grid-column:1/-1">
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">Commentaire</div>
+          <textarea id="bf_comment" rows="2" style="width:100%;resize:vertical" placeholder="Commentaire...">${esc(bus?.comment||'')}</textarea>
+        </div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" id="cancelBusForm">Annuler</button>
+          <button class="btn primary" id="submitBusForm">${isEdit?'✓ Enregistrer':'+ Créer'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('closeBusForm').onclick = () => mo.className='';
+  document.getElementById('cancelBusForm').onclick = () => mo.className='';
+  mo.onclick = e => { if(e.target===mo) mo.className=''; };
+
+  document.getElementById('submitBusForm').onclick = async () => {
+    const data = {
+      id:      document.getElementById('bf_id').value.trim(),
+      lot:     document.getElementById('bf_lot').value,
+      dor:     document.getElementById('bf_dor').value,
+      ext:     document.getElementById('bf_ext').value.trim(),
+      etat:    +document.getElementById('bf_etat').value,
+      av:      +document.getElementById('bf_av').value||0,
+      rr:      document.getElementById('bf_rr').value.trim(),
+      risque:  document.getElementById('bf_risque').value,
+      liv:     document.getElementById('bf_liv').value.trim(),
+      mes:     document.getElementById('bf_mes').value.trim(),
+      comment: document.getElementById('bf_comment').value.trim(),
+      user:    S.currentUser?.prenom||'système',
+    };
+    const errEl = document.getElementById('busFormErr');
+    if(!data.id){errEl.textContent='Le nom de topologie est obligatoire';errEl.style.display='';return;}
+    if(!data.lot){errEl.textContent='Le lot est obligatoire';errEl.style.display='';return;}
+    if(data.av<0||data.av>100){errEl.textContent='L'avancement doit être entre 0 et 100';errEl.style.display='';return;}
+    try {
+      if(isEdit){
+        await api.put('/api/bus/'+encodeURIComponent(bus.id), data);
+        notify('BUS mis à jour');
+      } else {
+        await api.post('/api/bus', data);
+        notify('BUS créé');
+      }
+      mo.className='';
+      await loadAll(); renderMain();
+    } catch(e){errEl.textContent=e.message;errEl.style.display='';}
+  };
+}
+
+// Modal générique pour CDD
+function openCDDForm(row) {
+  const isEdit = !!row;
+  const mo = document.getElementById('mo-overlay');
+  mo.className='open';
+  mo.innerHTML=`<div class="modal" style="max-width:640px">
+    <div class="modal-hdr">
+      <div style="font-size:17px;font-weight:700;color:#fff">${isEdit?'Modifier le CDD':'Nouveau CDD'}</div>
+      <button id="closeCDDForm" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="cddFormErr" style="display:none;padding:10px 14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:#ef4444;font-size:13px;margin-bottom:14px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Topologie <span style="color:#ef4444">*</span></div>
+          <input id="cd_topo" value="${esc(row?.topo||'')}" ${isEdit?'readonly style="opacity:.6"':''} style="width:100%" placeholder="38_73_BUS_3001"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Lot</div>
+          <select id="cd_lot" style="width:100%">${['','LOT1','LOT2','LOT3'].map(l=>`<option value="${l}"${row?.lot===l?' selected':''}>${l||'–'}</option>`).join('')}</select></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Département</div><input id="cd_dept" value="${esc(row?.dept||'')}" style="width:100%" placeholder="38"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">RR</div><input id="cd_rr" value="${esc(row?.rr||'')}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Site Code 42C</div><input id="cd_sc" value="${esc(row?.sc||'')}" style="width:100%" placeholder="38018XYZ"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Nom site</div><input id="cd_ns" value="${esc(row?.ns||'')}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Date MAD Orange</div><input id="cd_mad" value="${esc(row?.mad||'')}" style="width:100%" placeholder="2026-04-29"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">N° Commande</div><input id="cd_cmd" value="${esc(row?.cmd||'')}" style="width:100%" placeholder="F48424230226"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">PFTO lancé</div>
+          <select id="cd_pfto" style="width:100%"><option${row?.pfto==='OUI'?' selected':''}>OUI</option><option${row?.pfto!=='OUI'?' selected':''}>NON</option></select></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">SIN3 MAJ</div>
+          <select id="cd_sin3" style="width:100%"><option${row?.sin3==='OUI'?' selected':''}>OUI</option><option${row?.sin3!=='OUI'?' selected':''}>NON</option></select></div>
+        <div style="grid-column:1/-1"><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Commentaire</div>
+          <textarea id="cd_comment" rows="2" style="width:100%;resize:vertical">${esc(row?.comment||'')}</textarea></div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" onclick="document.getElementById('mo-overlay').className=''">Annuler</button>
+          <button class="btn primary" id="submitCDDForm">${isEdit?'✓ Enregistrer':'+ Créer'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('closeCDDForm').onclick=()=>mo.className='';
+  mo.onclick=e=>{if(e.target===mo)mo.className='';};
+  document.getElementById('submitCDDForm').onclick=async()=>{
+    const data={topo:document.getElementById('cd_topo').value.trim(),lot:document.getElementById('cd_lot').value,dept:document.getElementById('cd_dept').value.trim(),rr:document.getElementById('cd_rr').value.trim(),sc:document.getElementById('cd_sc').value.trim(),ns:document.getElementById('cd_ns').value.trim(),mad:document.getElementById('cd_mad').value.trim(),cmd:document.getElementById('cd_cmd').value.trim(),pfto:document.getElementById('cd_pfto').value,sin3:document.getElementById('cd_sin3').value,comment:document.getElementById('cd_comment').value.trim()};
+    const errEl=document.getElementById('cddFormErr');
+    if(!data.topo){errEl.textContent='Topologie obligatoire';errEl.style.display='';return;}
+    try{
+      if(isEdit)await api.put('/api/cdd/'+row.id,data);
+      else await api.post('/api/cdd',data);
+      notify(isEdit?'CDD mis à jour':'CDD créé');mo.className='';await loadAll();renderMain();
+    }catch(e){errEl.textContent=e.message;errEl.style.display='';}
+  };
+}
+
+// Modal mesure
+function openMesureForm(row) {
+  const isEdit=!!row;
+  const mo=document.getElementById('mo-overlay');mo.className='open';
+  mo.innerHTML=`<div class="modal" style="max-width:520px">
+    <div class="modal-hdr"><div style="font-size:17px;font-weight:700;color:#fff">${isEdit?'Modifier mesures':'Nouvelle mesure'}</div>
+      <button onclick="document.getElementById('mo-overlay').className=''" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button></div>
+    <div class="modal-body">
+      <div id="mesFormErr" style="display:none;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:#ef4444;font-size:13px;margin-bottom:12px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="grid-column:1/-1"><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Topologie <span style="color:#ef4444">*</span></div>
+          <input id="mf_topo" value="${esc(row?.topo||'')}" ${isEdit?'readonly style="opacity:.6"':''} style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">RR</div><input id="mf_rr" value="${esc(row?.rr||'')}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Accès MOE</div>
+          <select id="mf_moe" style="width:100%"><option${row?.moe==='Ok'?' selected':''}>Ok</option><option${row?.moe!=='Ok'?' selected':''}>Nok</option></select></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Total tronçons</div><input id="mf_nbt" type="number" min="0" value="${row?.nbT??0}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Tronçons mesurés</div><input id="mf_nbm" type="number" min="0" value="${row?.nbM??0}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Tronçons OK</div><input id="mf_ok" type="number" min="0" value="${row?.ok??0}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Tronçons NOK</div><input id="mf_nok" type="number" min="0" value="${row?.nok??0}" style="width:100%"></div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" onclick="document.getElementById('mo-overlay').className=''">Annuler</button>
+          <button class="btn primary" id="submitMesForm">${isEdit?'✓ Enregistrer':'+ Créer'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  mo.onclick=e=>{if(e.target===mo)mo.className='';};
+  document.getElementById('submitMesForm').onclick=async()=>{
+    const data={topo:document.getElementById('mf_topo').value.trim(),rr:document.getElementById('mf_rr').value.trim(),moe:document.getElementById('mf_moe').value,nbT:+document.getElementById('mf_nbt').value||0,nbM:+document.getElementById('mf_nbm').value||0,ok:+document.getElementById('mf_ok').value||0,nok:+document.getElementById('mf_nok').value||0};
+    const errEl=document.getElementById('mesFormErr');
+    if(!data.topo){errEl.textContent='Topologie obligatoire';errEl.style.display='';return;}
+    try{
+      if(isEdit)await api.put('/api/mesures/'+row.id,data);
+      else await api.post('/api/mesures',data);
+      notify(isEdit?'Mesure mise à jour':'Mesure créée');mo.className='';await loadAll();renderMain();
+    }catch(e){errEl.textContent=e.message;errEl.style.display='';}
+  };
+}
+
+// Modal emplacement
+function openEmplForm(row) {
+  const isEdit=!!row;
+  const mo=document.getElementById('mo-overlay');mo.className='open';
+  const ouiNon=(id,val)=>`<select id="${id}" style="width:100%"><option${val==='OUI'?' selected':''}>OUI</option><option${val!=='OUI'?' selected':''}>NON</option></select>`;
+  mo.innerHTML=`<div class="modal" style="max-width:580px">
+    <div class="modal-hdr"><div style="font-size:17px;font-weight:700;color:#fff">${isEdit?'Modifier emplacement':'Nouvel emplacement'}</div>
+      <button onclick="document.getElementById('mo-overlay').className=''" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button></div>
+    <div class="modal-body">
+      <div id="eplFormErr" style="display:none;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:#ef4444;font-size:13px;margin-bottom:12px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="grid-column:1/-1"><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Topologie <span style="color:#ef4444">*</span></div>
+          <input id="ep_topo" value="${esc(row?.topo||'')}" ${isEdit?'readonly style="opacity:.6"':''} style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Lot</div>
+          <select id="ep_lot" style="width:100%">${['','LOT1','LOT2','LOT3'].map(l=>`<option value="${l}"${row?.lot===l?' selected':''}>${l||'–'}</option>`).join('')}</select></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Site</div><input id="ep_site" value="${esc(row?.site||'')}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Département</div><input id="ep_dept" value="${esc(row?.dept||'')}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">RR</div><input id="ep_rr" value="${esc(row?.rr||'')}" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Équipe prévenue</div>${ouiNon('ep_ep',row?.ep)}</div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">RDV envoyé</div>${ouiNon('ep_rdv',row?.rdv)}</div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Annexe B signée</div>${ouiNon('ep_aB',row?.aB)}</div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Installation</div>${ouiNon('ep_inst',row?.inst)}</div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Consuel</div>${ouiNon('ep_cons',row?.cons)}</div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Annexe C</div>${ouiNon('ep_aC',row?.aC)}</div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" onclick="document.getElementById('mo-overlay').className=''">Annuler</button>
+          <button class="btn primary" id="submitEplForm">${isEdit?'✓ Enregistrer':'+ Créer'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  mo.onclick=e=>{if(e.target===mo)mo.className='';};
+  document.getElementById('submitEplForm').onclick=async()=>{
+    const data={topo:document.getElementById('ep_topo').value.trim(),lot:document.getElementById('ep_lot').value,site:document.getElementById('ep_site').value.trim(),dept:document.getElementById('ep_dept').value.trim(),rr:document.getElementById('ep_rr').value.trim(),ep:document.getElementById('ep_ep').value,rdv:document.getElementById('ep_rdv').value,aB:document.getElementById('ep_aB').value,inst:document.getElementById('ep_inst').value,cons:document.getElementById('ep_cons').value,aC:document.getElementById('ep_aC').value};
+    const errEl=document.getElementById('eplFormErr');
+    if(!data.topo){errEl.textContent='Topologie obligatoire';errEl.style.display='';return;}
+    try{
+      if(isEdit)await api.put('/api/emplacements/'+row.id,data);
+      else await api.post('/api/emplacements',data);
+      notify(isEdit?'Emplacement mis à jour':'Emplacement créé');mo.className='';await loadAll();renderMain();
+    }catch(e){errEl.textContent=e.message;errEl.style.display='';}
+  };
+}
+
+async function deleteConfirm(msg, url) {
+  if(!confirm(msg)) return false;
+  try { await api.delete(url); return true; }
+  catch(e){ notify(e.message,'error'); return false; }
+}
+
 function renderSidebar(){
   const grps=[...new Set(NAV.map(n=>n.g))];
   const cu=S.currentUser;
@@ -710,7 +972,8 @@ function pageBUS(){
 function pageDelivery(){
   const COLS=[['topo','Topologie'],['lot','Lot'],['hRcv','HEPOC reçu'],['hF','HEPOC Free'],['hRnv','HEPOC renvoyé'],['cRcv','CPM reçu'],['cF','CPM Free'],['cRnv','CPM renvoyé'],['vO','Valid. Orange'],['cf','Cmd ferme']];
   return `<div class="page">
-    <div class="page-hdr"><div><div class="page-title">Suivi Delivery</div><div class="page-sub">HEPOC · CPM · Commandes fermes</div></div></div>
+    <div class="page-hdr"><div><div class="page-title">Suivi Delivery</div><div class="page-sub">HEPOC · CPM · Commandes fermes</div></div>
+      <button class="btn" onclick="window.open('/api/export','_blank')">↓ Export Excel</button></div>
     <div class="kpi4" style="margin-bottom:16px">
       ${krow('Cmd fermes',S.delivery.filter(d=>d.cf==='OUI').length,'#10b981','✓','')}
       ${krow('En attente',S.delivery.filter(d=>d.cf==='NON').length,'#f59e0b','⏳','')}
@@ -745,7 +1008,11 @@ function pageTravaux(){
   }
   return `<div class="page">
     <div class="page-hdr"><div><div class="page-title">Suivi Travaux</div><div class="page-sub">Plans · Chantiers · Livraisons</div></div>
-      <div style="display:flex;gap:4px"><button class="btn sm primary" id="vTable">📋 Tableau</button><button class="btn sm" id="vKanban">🗂 Kanban</button></div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn sm" onclick="window.open('/api/export','_blank')">↓ Excel</button>
+        <button class="btn sm primary" id="vTable">📋 Tableau</button>
+        <button class="btn sm" id="vKanban">🗂 Kanban</button>
+      </div></div>
     <div class="kpi4" style="margin-bottom:16px">
       ${krow('Éd. Plans',S.bus.filter(b=>b.etat===3).length,'#f59e0b','📄','')}
       ${krow('En travaux',S.bus.filter(b=>b.etat===4).length,'#f97316','🏗','')}
@@ -771,7 +1038,8 @@ function pageTravaux(){
 function pageMesures(){
   const tot={nbT:S.mesures.reduce((a,m)=>a+m.nbT,0),nbM:S.mesures.reduce((a,m)=>a+m.nbM,0),ok:S.mesures.reduce((a,m)=>a+m.ok,0),nok:S.mesures.reduce((a,m)=>a+m.nok,0)};
   return `<div class="page">
-    <div class="page-hdr"><div><div class="page-title">Suivi Mesures</div></div></div>
+    <div class="page-hdr"><div><div class="page-title">Suivi Mesures</div><div class="page-sub">Tronçons · Accès MOE · Résultats</div></div>
+      <button class="btn primary" id="newMesBtn">+ Ajouter mesure</button></div>
     <div class="kpi4" style="margin-bottom:16px">
       ${krow('Total tronçons',tot.nbT,'#6b7280','📏','')}
       ${krow('Mesurés',tot.nbM,'#3b82f6','📊',tot.nbT?Math.round(tot.nbM/tot.nbT*100)+'%':'')}
@@ -779,7 +1047,7 @@ function pageMesures(){
       ${krow('NOK',tot.nok,'#ef4444','✗','')}
     </div>
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
-      <thead><tr><th>Topologie</th><th>RR</th><th>Tronçons</th><th>Accès MOE</th><th>Mesurés</th><th>OK</th><th>NOK</th><th>Taux mesure</th><th>Taux échec</th></tr></thead>
+      <thead><tr><th>Topologie</th><th>RR</th><th>Tronçons</th><th>Accès MOE</th><th>Mesurés</th><th>OK</th><th>NOK</th><th>Taux mesure</th><th>Taux échec</th><th style="text-align:center">Actions</th></tr></thead>
       <tbody>${S.mesures.map((m,i)=>{const tE=(m.ok+m.nok)?Math.round(m.nok/(m.ok+m.nok)*100):0;return`<tr class="${i%2?'odd':'even'}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(m.topo)}</span></td>
         <td style="color:var(--sub);font-size:11px">${esc(m.rr)}</td>
@@ -788,6 +1056,12 @@ function pageMesures(){
         <td style="color:${m.nok?'#ef4444':'var(--mut)'};font-weight:${m.nok?600:400}">${m.nok}</td>
         <td style="min-width:100px">${pb(m.nbM,m.nbT,'#3b82f6')}</td>
         <td style="color:${tE>30?'#ef4444':'var(--mut)'};font-size:11px">${tE}%</td>
+        <td style="text-align:center">
+          <div style="display:flex;gap:4px;justify-content:center">
+            <button class="btn sm" data-edit-mes="${m.id}" title="Modifier">✏️</button>
+            <button class="btn sm" data-del-mes="${m.id}" title="Supprimer" style="color:#ef4444;border-color:rgba(239,68,68,.3)">🗑</button>
+          </div>
+        </td>
       </tr>`;}).join('')}</tbody>
     </table></div></div>
   </div>`;
@@ -795,14 +1069,15 @@ function pageMesures(){
 
 function pageCDD(){
   return `<div class="page">
-    <div class="page-hdr"><div><div class="page-title">Suivi CDD</div><div class="page-sub">Commandes COL · SIN3 · PFTO</div></div></div>
+    <div class="page-hdr"><div><div class="page-title">Suivi CDD</div><div class="page-sub">Commandes COL · SIN3 · PFTO</div></div>
+      <button class="btn primary" id="newCDDBtn">+ Ajouter CDD</button></div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
       ${krow('Total sites',S.cdd.length,'#6b7280','📍','')}
       ${krow('PFTO lancé',S.cdd.filter(c=>c.pfto==='OUI').length,'#10b981','✓','')}
       ${krow('SIN3 non MAJ',S.cdd.filter(c=>c.sin3==='NON').length,'#ef4444','⚠','')}
     </div>
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
-      <thead><tr><th>Topologie</th><th>Lot</th><th>Dept</th><th>RR</th><th>Site Code</th><th>Nom</th><th>Date MAD</th><th>N° commande</th><th>PFTO</th><th>SIN3</th><th>Commentaire</th></tr></thead>
+      <thead><tr><th>Topologie</th><th>Lot</th><th>Dept</th><th>RR</th><th>Site Code</th><th>Nom</th><th>Date MAD</th><th>N° commande</th><th>PFTO</th><th>SIN3</th><th>Commentaire</th><th style="text-align:center">Actions</th></tr></thead>
       <tbody>${S.cdd.map((c,i)=>`<tr class="${i%2?'odd':'even'}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(c.topo)}</span></td>
         <td><span class="lot-badge">${c.lot}</span></td>
@@ -815,6 +1090,12 @@ function pageCDD(){
         <td>${obadge(c.pfto)}</td>
         <td>${obadge(c.sin3)}</td>
         <td style="color:var(--mut);font-size:11px">${esc(c.comment)||'–'}</td>
+        <td style="text-align:center">
+          <div style="display:flex;gap:4px;justify-content:center">
+            <button class="btn sm" data-edit-cdd="${c.id}" title="Modifier">✏️</button>
+            <button class="btn sm" data-del-cdd="${c.id}" title="Supprimer" style="color:#ef4444;border-color:rgba(239,68,68,.3)">🗑</button>
+          </div>
+        </td>
       </tr>`).join('')}</tbody>
     </table></div></div>
   </div>`;
@@ -822,9 +1103,10 @@ function pageCDD(){
 
 function pageEmpl(){
   return `<div class="page">
-    <div class="page-hdr"><div><div class="page-title">Suivi Emplacements</div></div></div>
+    <div class="page-hdr"><div><div class="page-title">Suivi Emplacements</div><div class="page-sub">Annexes · RDV · Installation · Consuel</div></div>
+      <button class="btn primary" id="newEmplBtn">+ Ajouter emplacement</button></div>
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
-      <thead><tr><th>Topologie</th><th>Lot</th><th>Site</th><th>Dept</th><th>RR</th><th>Équipe</th><th>RDV</th><th>Annexe B</th><th>Install.</th><th>Consuel</th><th>Annexe C</th></tr></thead>
+      <thead><tr><th>Topologie</th><th>Lot</th><th>Site</th><th>Dept</th><th>RR</th><th>Équipe</th><th>RDV</th><th>Annexe B</th><th>Install.</th><th>Consuel</th><th>Annexe C</th><th style="text-align:center">Actions</th></tr></thead>
       <tbody>${S.emplacements.map((e,i)=>`<tr class="${i%2?'odd':'even'}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(e.topo)}</span></td>
         <td><span class="lot-badge">${e.lot}</span></td>
@@ -832,6 +1114,12 @@ function pageEmpl(){
         <td style="color:var(--sub)">${e.dept}</td>
         <td style="color:var(--sub);font-size:11px">${esc(e.rr)}</td>
         ${[e.ep,e.rdv,e.aB,e.inst,e.cons,e.aC].map(v=>`<td>${obadge(v)}</td>`).join('')}
+        <td style="text-align:center">
+          <div style="display:flex;gap:4px;justify-content:center">
+            <button class="btn sm" data-edit-empl="${e.id}" title="Modifier">✏️</button>
+            <button class="btn sm" data-del-empl="${e.id}" title="Supprimer" style="color:#ef4444;border-color:rgba(239,68,68,.3)">🗑</button>
+          </div>
+        </td>
       </tr>`).join('')}</tbody>
     </table></div></div>
   </div>`;
@@ -1425,6 +1713,53 @@ function bindPageEvents(){
 
   // Users events
   bindUsersEvents();
+
+  // Export Excel global
+  document.getElementById('exportXlsBtn')?.addEventListener('click',()=>{
+    window.open('/api/export','_blank');
+  });
+
+  // BUS CRUD
+  document.getElementById('newBusBtn')?.addEventListener('click',()=>openBusForm(null));
+  document.querySelectorAll('[data-edit-bus]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();
+    const b=S.bus.find(x=>x.id===el.dataset.editBus); if(b)openBusForm(b);
+  }));
+  document.querySelectorAll('[data-del-bus]').forEach(el=>el.addEventListener('click',async e=>{
+    e.stopPropagation();
+    const ok=await deleteConfirm('Supprimer ce BUS et toutes ses données associées ?','/api/bus/'+encodeURIComponent(el.dataset.delBus));
+    if(ok){notify('BUS supprimé');await loadAll();renderMain();}
+  }));
+
+  // Mesures CRUD
+  document.getElementById('newMesBtn')?.addEventListener('click',()=>openMesureForm(null));
+  document.querySelectorAll('[data-edit-mes]').forEach(el=>el.addEventListener('click',()=>{
+    const m=S.mesures.find(x=>String(x.id)===String(el.dataset.editMes)); if(m)openMesureForm(m);
+  }));
+  document.querySelectorAll('[data-del-mes]').forEach(el=>el.addEventListener('click',async()=>{
+    const ok=await deleteConfirm('Supprimer cette mesure ?','/api/mesures/'+el.dataset.delMes);
+    if(ok){notify('Mesure supprimée');await loadAll();renderMain();}
+  }));
+
+  // CDD CRUD
+  document.getElementById('newCDDBtn')?.addEventListener('click',()=>openCDDForm(null));
+  document.querySelectorAll('[data-edit-cdd]').forEach(el=>el.addEventListener('click',()=>{
+    const c=S.cdd.find(x=>String(x.id)===String(el.dataset.editCdd)); if(c)openCDDForm(c);
+  }));
+  document.querySelectorAll('[data-del-cdd]').forEach(el=>el.addEventListener('click',async()=>{
+    const ok=await deleteConfirm('Supprimer ce CDD ?','/api/cdd/'+el.dataset.delCdd);
+    if(ok){notify('CDD supprimé');await loadAll();renderMain();}
+  }));
+
+  // Emplacements CRUD
+  document.getElementById('newEmplBtn')?.addEventListener('click',()=>openEmplForm(null));
+  document.querySelectorAll('[data-edit-empl]').forEach(el=>el.addEventListener('click',()=>{
+    const e=S.emplacements.find(x=>String(x.id)===String(el.dataset.editEmpl)); if(e)openEmplForm(e);
+  }));
+  document.querySelectorAll('[data-del-empl]').forEach(el=>el.addEventListener('click',async()=>{
+    const ok=await deleteConfirm('Supprimer cet emplacement ?','/api/emplacements/'+el.dataset.delEmpl);
+    if(ok){notify('Emplacement supprimé');await loadAll();renderMain();}
+  }));
   // CPM imports
   const cpmGlobal=document.getElementById('cpmFileInput');
   if(cpmGlobal) cpmGlobal.addEventListener('change',e=>handleCPMImport(e.target.files[0]));
