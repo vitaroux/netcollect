@@ -522,6 +522,143 @@ app.post('/api/import/cpm', upload.single('file'), async (req,res) => {
 });
 
 
+
+// ═══════════════════════════════════════════════
+// USERS / PROFILS
+// ═══════════════════════════════════════════════
+const PROFILES = ['Admin','CDP','CDR','BE','Projet'];
+
+async function initUsers() {
+  if (USE_PG) {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id          SERIAL PRIMARY KEY,
+        nom         TEXT NOT NULL,
+        prenom      TEXT NOT NULL,
+        email       TEXT NOT NULL UNIQUE,
+        profil      TEXT NOT NULL DEFAULT 'Projet',
+        actif       BOOLEAN DEFAULT TRUE,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    // Créer un admin par défaut si aucun utilisateur
+    const {rows} = await pool.query('SELECT COUNT(*)::int as n FROM users');
+    if (rows[0].n === 0) {
+      await pool.query(
+        "INSERT INTO users(nom,prenom,email,profil) VALUES('Admin','NetCollect','admin@netcollect.fr','Admin') ON CONFLICT(email) DO NOTHING"
+      );
+    }
+  } else {
+    const users = loadJ('users');
+    if (users.length === 0) {
+      saveJ('users', [{id:1,nom:'Admin',prenom:'NetCollect',email:'admin@netcollect.fr',profil:'Admin',actif:true,created_at:now(),updated_at:now()}]);
+    }
+  }
+}
+
+// GET liste utilisateurs
+app.get('/api/users', async (req,res) => {
+  try {
+    if (USE_PG) {
+      const {rows} = await pool.query('SELECT * FROM users ORDER BY nom,prenom');
+      return res.json(rows);
+    }
+    res.json(loadJ('users').sort((a,b)=>a.nom.localeCompare(b.nom)));
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+
+// POST créer utilisateur
+app.post('/api/users', async (req,res) => {
+  try {
+    const {nom,prenom,email,profil} = req.body;
+    // Validations
+    if (!nom?.trim())    return res.status(400).json({error:'Le nom est obligatoire'});
+    if (!prenom?.trim()) return res.status(400).json({error:'Le prénom est obligatoire'});
+    if (!email?.trim())  return res.status(400).json({error:"L'adresse mail est obligatoire"});
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) return res.status(400).json({error:'Adresse mail invalide'});
+    if (!profil || !PROFILES.includes(profil)) return res.status(400).json({error:'Profil invalide'});
+
+    if (USE_PG) {
+      try {
+        const {rows} = await pool.query(
+          'INSERT INTO users(nom,prenom,email,profil) VALUES($1,$2,$3,$4) RETURNING *',
+          [nom.trim(),prenom.trim(),email.trim().toLowerCase(),profil]
+        );
+        return res.status(201).json(rows[0]);
+      } catch(e) {
+        if (e.code==='23505') return res.status(400).json({error:'Cette adresse mail est déjà utilisée'});
+        throw e;
+      }
+    }
+    const db = loadJ('users');
+    if (db.find(u=>u.email===email.trim().toLowerCase())) return res.status(400).json({error:'Cette adresse mail est déjà utilisée'});
+    const row = {id:Date.now(),nom:nom.trim(),prenom:prenom.trim(),email:email.trim().toLowerCase(),profil,actif:true,created_at:now(),updated_at:now()};
+    db.push(row); saveJ('users',db);
+    res.status(201).json(row);
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+
+// PUT modifier utilisateur
+app.put('/api/users/:id', async (req,res) => {
+  try {
+    const {nom,prenom,email,profil,actif} = req.body;
+    if (nom    !== undefined && !nom?.trim())    return res.status(400).json({error:'Le nom est obligatoire'});
+    if (prenom !== undefined && !prenom?.trim()) return res.status(400).json({error:'Le prénom est obligatoire'});
+    if (email  !== undefined) {
+      if (!email?.trim()) return res.status(400).json({error:"L'adresse mail est obligatoire"});
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) return res.status(400).json({error:'Adresse mail invalide'});
+    }
+    if (profil !== undefined && !PROFILES.includes(profil)) return res.status(400).json({error:'Profil invalide'});
+
+    if (USE_PG) {
+      const fields=[]; const vals=[];
+      if(nom    !==undefined){fields.push(`nom=$${fields.length+1}`);    vals.push(nom.trim());}
+      if(prenom !==undefined){fields.push(`prenom=$${fields.length+1}`); vals.push(prenom.trim());}
+      if(email  !==undefined){fields.push(`email=$${fields.length+1}`);  vals.push(email.trim().toLowerCase());}
+      if(profil !==undefined){fields.push(`profil=$${fields.length+1}`); vals.push(profil);}
+      if(actif  !==undefined){fields.push(`actif=$${fields.length+1}`);  vals.push(actif);}
+      if(!fields.length) return res.status(400).json({error:'Aucun champ à modifier'});
+      try {
+        const {rows} = await pool.query(
+          `UPDATE users SET ${fields.join(',')},updated_at=NOW() WHERE id=$${fields.length+1} RETURNING *`,
+          [...vals, req.params.id]
+        );
+        if (!rows[0]) return res.status(404).json({error:'Utilisateur introuvable'});
+        return res.json(rows[0]);
+      } catch(e) {
+        if (e.code==='23505') return res.status(400).json({error:'Cette adresse mail est déjà utilisée'});
+        throw e;
+      }
+    }
+    const db=loadJ('users'); const idx=db.findIndex(u=>u.id===+req.params.id);
+    if(idx<0) return res.status(404).json({error:'Utilisateur introuvable'});
+    if(nom    !==undefined) db[idx].nom    = nom.trim();
+    if(prenom !==undefined) db[idx].prenom = prenom.trim();
+    if(email  !==undefined) {
+      if(db.find((u,i)=>u.email===email.trim().toLowerCase()&&i!==idx)) return res.status(400).json({error:'Email déjà utilisée'});
+      db[idx].email = email.trim().toLowerCase();
+    }
+    if(profil !==undefined) db[idx].profil = profil;
+    if(actif  !==undefined) db[idx].actif  = actif;
+    db[idx].updated_at=now(); saveJ('users',db); res.json(db[idx]);
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+
+// DELETE supprimer utilisateur
+app.delete('/api/users/:id', async (req,res) => {
+  try {
+    if (USE_PG) {
+      const {rows} = await pool.query('DELETE FROM users WHERE id=$1 RETURNING id',[req.params.id]);
+      if (!rows[0]) return res.status(404).json({error:'Utilisateur introuvable'});
+      return res.json({ok:true});
+    }
+    const db=loadJ('users'); const idx=db.findIndex(u=>u.id===+req.params.id);
+    if(idx<0) return res.status(404).json({error:'Utilisateur introuvable'});
+    db.splice(idx,1); saveJ('users',db); res.json({ok:true});
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+
 // ── SETUP : force table creation ─────────────────
 app.get('/api/setup', async (req,res) => {
   if (!USE_PG) return res.json({status:'ok', mode:'json', message:'Pas besoin de setup en mode JSON'});
@@ -552,5 +689,10 @@ app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')))
 app.listen(PORT,'0.0.0.0',async()=>{
   console.log(`\n✅  NetCollect → http://localhost:${PORT}`);
   console.log(`📊  Stockage   → ${USE_PG?'PostgreSQL (DATABASE_URL)':'Fichiers JSON (data/)'}`);
-  if(USE_PG) await initDB().catch(e=>console.error('DB init error:',e));
+  if(USE_PG) {
+    await initDB().catch(e=>console.error('DB init error:',e));
+    await initUsers().catch(e=>console.error('Users init error:',e));
+  } else {
+    await initUsers().catch(e=>console.error('Users init error:',e));
+  }
 });
