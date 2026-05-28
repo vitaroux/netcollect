@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NetCollect</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--bg:#f0f2f7;--card:#fff;--sb:#fff;--sbb:#e8eaf0;--text:#1e1b4b;--sub:#6b7280;--mut:#9ca3af;--brd:#e5e7eb;--acc:#7c3aed;--al:#ede9fe;--th:#f9fafb;--row:#fff;--ra:#f3f4f6;--hov:#f3f0ff;--inp:#fff;--inb:#d1d5db;--na:#7c3aed;--nb:rgba(124,58,237,.1);--nt:#4b5563;--sh:0 1px 4px rgba(0,0,0,.07);--t0bg:#f1f5f9;--t0c:#64748b;--t1bg:#dbeafe;--t1c:#1d4ed8;--t2bg:#ede9fe;--t2c:#6d28d9;--t3bg:#fef9c3;--t3c:#a16207;--t4bg:#ffedd5;--t4c:#c2410c;--t5bg:#dcfce7;--t5c:#15803d;--t6bg:#cffafe;--t6c:#0e7490}
+.dk{--bg:#0f172a;--card:#1e293b;--sb:#0f172a;--sbb:#1e293b;--text:#f1f5f9;--sub:#94a3b8;--mut:#475569;--brd:#334155;--acc:#a78bfa;--al:rgba(167,139,250,.12);--th:#1a2744;--row:#1e293b;--ra:#1a2235;--hov:rgba(167,139,250,.12);--inp:#0f172a;--inb:#334155;--na:#a78bfa;--nb:rgba(167,139,250,.12);--nt:#64748b;--t0bg:rgba(100,116,139,.15);--t0c:#94a3b8;--t1bg:rgba(59,130,246,.12);--t1c:#93c5fd;--t2bg:rgba(139,92,246,.12);--t2c:#c4b5fd;--t3bg:rgba(234,179,8,.1);--t3c:#fde68a;--t4bg:rgba(249,115,22,.1);--t4c:#fdba74;--t5bg:rgba(34,197,94,.1);--t5c:#86efac;--t6bg:rgba(6,182,212,.1);--t6c:#67e8f9}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body{background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
+#sidebar{width:204px;background:var(--sb);border-right:1px solid var(--sbb);display:flex;flex-direction:column;flex-shrink:0;height:100vh}
+#main{flex:1;overflow-y:auto;overflow-x:hidden;height:100vh}
+.sb-logo{padding:15px 14px 11px;border-bottom:1px solid var(--sbb)}
+.sb-nav{flex:1;padding:6px;overflow-y:auto}
+.sb-grp{font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;padding:8px 8px 3px}
+.sb-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 9px;border-radius:7px;border:none;cursor:pointer;font-size:12px;margin-bottom:1px;text-align:left;background:transparent;color:var(--nt);transition:all .12s}
+.sb-btn:hover,.sb-btn.active{background:var(--nb);color:var(--na)}
+.sb-btn.active{font-weight:600}
+.sb-foot{padding:10px 12px;border-top:1px solid var(--sbb)}
+.page{padding:22px}
+.page-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.page-title{font-size:19px;font-weight:700;color:var(--text)}
+.page-sub{font-size:12px;color:var(--sub);margin-top:3px}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:15px;box-shadow:var(--sh)}
+.section-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+.krow{background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--sh)}
+.krow-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.kcrd{background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:13px 15px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--sh)}
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.pb-wrap{display:flex;align-items:center;gap:7px}
+.pb-track{flex:1;height:4px;background:var(--brd);border-radius:99;overflow:hidden}
+.pb-fill{height:100%;border-radius:99}
+.pb-pct{font-size:10px;color:var(--mut);min-width:26px;text-align:right}
+.tbl-wrap{background:var(--card);border:1px solid var(--brd);border-radius:10px;overflow:hidden;box-shadow:var(--sh)}
+.tbl-foot{padding:9px 14px;border-top:1px solid var(--brd);background:var(--th);display:flex;align-items:center;justify-content:space-between}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:9px 13px;text-align:left;font-size:10px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--brd);background:var(--th);white-space:nowrap;cursor:pointer;user-select:none}
+td{padding:9px 13px;border-bottom:1px solid var(--brd)}
+.trow:hover td{background:var(--hov)!important;cursor:pointer}
+.even td{background:var(--row)}.odd td{background:var(--ra)}
+input,select,textarea{background:var(--inp);border:1px solid var(--inb);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px;outline:none;font-family:inherit}
+input:focus,select:focus{border-color:var(--acc)}
+input::placeholder{color:var(--mut)}
+select option{background:var(--card)}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;border:1px solid var(--brd);background:transparent;color:var(--sub);font-size:12px;font-weight:500;cursor:pointer}
+.btn:hover{background:var(--hov)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.primary:hover{opacity:.9}
+.btn.sm{padding:4px 10px;font-size:11px}
+.flt-bar{display:flex;gap:8px;flex-wrap:wrap}
+.mono{font-family:monospace;font-size:11px}
+.lot-badge{font-size:11px;padding:2px 7px;border-radius:4px;background:var(--al);color:var(--acc);font-weight:600}
+.pg-btn{width:28px;height:28px;border-radius:7px;border:1px solid var(--brd);background:transparent;color:var(--sub);cursor:pointer;font-size:11px}
+.pg-btn.active{background:var(--acc);border-color:var(--acc);color:#fff}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.kpi4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpi8{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;margin-bottom:18px}
+.kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.kboard{min-width:265px;background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:13px;flex-shrink:0;box-shadow:var(--sh)}
+.kcard{background:var(--th);border-radius:8px;padding:10px;border:1px solid var(--brd);margin-bottom:8px}
+.uploader{border:2px dashed var(--brd);border-radius:12px;padding:44px 32px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px}
+.uploader:hover,.uploader.drag{border-color:var(--acc);background:var(--al)}
+/* Modal */
+#mo-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:16px}
+#mo-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--brd);border-radius:14px;width:100%;max-width:760px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-hdr{background:var(--acc);border-radius:14px 14px 0 0;padding:18px 22px;display:flex;justify-content:space-between}
+.modal-tabs{display:flex;padding:0 22px;border-bottom:1px solid var(--brd)}
+.modal-tab{padding:10px 13px;border:none;background:none;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;color:var(--sub);transition:all .12s}
+.modal-tab.active{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
+.modal-body{padding:22px}
+.action-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--brd);cursor:pointer;background:var(--row);margin-bottom:7px;transition:background .1s}
+.action-card:hover{background:var(--hov)}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--brd);border-top-color:var(--acc);border-radius:50%;animation:spin .6s linear infinite;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.notif{position:fixed;bottom:20px;right:20px;padding:10px 18px;border-radius:9px;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:9999;animation:slideIn .2s ease}
+@keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+.history-item{padding:8px 0;border-bottom:1px solid var(--brd);font-size:12px}
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+<div id="main"><div class="page" style="display:flex;align-items:center;justify-content:center;height:100%"><div class="spinner"></div> Chargement...</div></div>
+<div id="mo-overlay"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ── CONFIG ──────────────────────────────────────
+const SC={0:{s:'Non démarré',v:'t0'},1:{s:'Design',v:'t1'},2:{s:'Delivery',v:'t2'},3:{s:'Éd. Plans',v:'t3'},4:{s:'Travaux',v:'t4'},5:{s:'Livré',v:'t5'},6:{s:'MES',v:'t6'}};
+const RC={Faible:{bg:'var(--t5bg)',c:'var(--t5c)'},Moyen:{bg:'var(--t3bg)',c:'var(--t3c)'},Élevé:{bg:'rgba(239,68,68,.1)',c:'#ef4444'}};
+const CC=['#7c3aed','#3b82f6','#06b6d4','#10b981','#f59e0b','#f97316','#ef4444'];
+const NAV=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Dashboard KPI',g:'Dashboards',i:'📊'},{id:'bus',l:'BUS / Topologies',g:'Modules',i:'🔌'},{id:'delivery',l:'Delivery',g:'Modules',i:'📦'},{id:'travaux',l:'Travaux',g:'Modules',i:'🏗'},{id:'mesures',l:'Mesures',g:'Modules',i:'📐'},{id:'cdd',l:'CDD',g:'Modules',i:'📋'},{id:'empl',l:'Emplacements',g:'Modules',i:'📍'},{id:'import',l:'Import Excel',g:'Config',i:'📥'},{id:'settings',l:'Paramétrage',g:'Config',i:'⚙'}];
+
+// ── STATE ────────────────────────────────────────
+const S={
+  page:'prod', dark:false,
+  bus:[], delivery:[], mesures:[], cdd:[], emplacements:[],
+  stats:{byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0},
+  fq:'',fl:'',fe:'',fr:'',fk:'',sk:'id',sd:1,pg:0,
+  modal:null, modalTab:'synthese', view:'table',
+  charts:{}, loading:false, userName: localStorage.getItem('nc_user') || 'Équipe'
+};
+
+// ── API ──────────────────────────────────────────
+const api = {
+  async get(url){ const r=await fetch(url); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async put(url,data){ const r=await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async post(url,data){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async upload(url,formData){ const r=await fetch(url,{method:'POST',body:formData}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+};
+
+async function loadAll(){
+  try {
+    const [bus,delivery,mesures,cdd,emplacements,stats] = await Promise.all([
+      api.get('/api/bus'), api.get('/api/delivery'), api.get('/api/mesures'),
+      api.get('/api/cdd'), api.get('/api/emplacements'), api.get('/api/stats'),
+    ]);
+    Object.assign(S, {bus,delivery,mesures,cdd,emplacements,stats});
+  } catch(e){ notify('Erreur connexion serveur: '+e.message,'error'); }
+}
+
+// ── HELPERS ──────────────────────────────────────
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const sbadge=e=>{const c=SC[e]||SC[0];return`<span class="badge" style="background:var(--${c.v}bg);color:var(--${c.v}c)">${c.s}</span>`;};
+const rbadge=r=>{const c=RC[r]||RC.Faible;return`<span class="badge" style="background:${c.bg};color:${c.c}">${r||'–'}</span>`;};
+const obadge=v=>{if(!v||v==='–')return`<span style="color:var(--mut)">–</span>`;const ok=v==='OUI'||v==='Ok';const pt=v.toLowerCase().includes('cours')||v.toLowerCase().includes('attente');const bg=ok?'var(--t5bg)':pt?'var(--t3bg)':'rgba(239,68,68,.1)';const c=ok?'var(--t5c)':pt?'var(--t3c)':'#ef4444';return`<span class="badge" style="background:${bg};color:${c}">${esc(v)}</span>`;};
+const pb=(v,max=100,col='var(--acc)')=>{const p=max>0?Math.round(v/max*100):0;return`<div class="pb-wrap"><div class="pb-track"><div class="pb-fill" style="width:${p}%;background:${col}"></div></div><span class="pb-pct">${p}%</span></div>`;};
+const krow=(lbl,val,col,ic,sub='')=>`<div class="krow"><div class="krow-icon" style="background:${col}20;color:${col}">${ic}</div><div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">${lbl}</div><div style="font-size:17px;font-weight:700;color:${col}">${val}</div>${sub?`<div style="font-size:10px;color:var(--mut)">${sub}</div>`:''}</div></div>`;
+const kcrd=(lbl,val,col,sub='')=>`<div class="kcrd"><div style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em">${lbl}</div><div style="font-size:25px;font-weight:700;color:${col}">${val}</div>${sub?`<div style="font-size:11px;color:var(--mut)">${sub}</div>`:''}</div>`;
+
+function notify(msg, type='success'){
+  const n=document.createElement('div');
+  n.className='notif';
+  n.style.background=type==='error'?'#ef4444':type==='warn'?'#f59e0b':'#10b981';
+  n.style.color='#fff';
+  n.textContent=msg;
+  document.body.appendChild(n);
+  setTimeout(()=>n.remove(),3000);
+}
+
+function destroyCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy();}catch(e){}});S.charts={};}
+
+// ── SIDEBAR ──────────────────────────────────────
+function renderSidebar(){
+  const grps=[...new Set(NAV.map(n=>n.g))];
+  let h=`<div class="sb-logo"><div style="display:flex;align-items:center;gap:8px">
+    <div style="width:28px;height:28px;border-radius:8px;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px">⚡</div>
+    <div><div style="font-size:14px;font-weight:700;color:var(--text)">NetCollect</div><div style="font-size:10px;color:var(--mut)">Réseau BUS / Orange</div></div>
+  </div></div><div class="sb-nav">`;
+  grps.forEach(g=>{
+    h+=`<div class="sb-grp">${g}</div>`;
+    NAV.filter(n=>n.g===g).forEach(n=>{ h+=`<button class="sb-btn${S.page===n.id?' active':''}" data-page="${n.id}">${n.i} ${n.l}</button>`; });
+  });
+  h+=`</div><div class="sb-foot">
+    <div style="font-size:10px;color:var(--mut);margin-bottom:6px">👤 ${esc(S.userName)}</div>
+    <button class="btn sm" id="themeBtn" style="width:100%;justify-content:center;margin-bottom:4px">${S.dark?'☀ Mode clair':'🌙 Mode sombre'}</button>
+    <button class="btn sm" id="userBtn" style="width:100%;justify-content:center">Changer de nom</button>
+  </div>`;
+  document.getElementById('sidebar').innerHTML=h;
+}
+
+// ── PAGES ─────────────────────────────────────────
+function pageProd(){
+  const {byEtat,byLot,avGlobal,cfCount,nokCount,sin3Nok,riskHigh}=S.stats;
+  const total=S.bus.length;
+  const bySm=Object.fromEntries((byEtat||[]).map(r=>[r.etat,r.count]));
+  const crit=S.bus.filter(b=>b.risque==='Élevé'||(b.etat===4&&b.av<25)).slice(0,8);
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Dashboard Production</div><div class="page-sub">Vue opérationnelle · ${new Date().toLocaleDateString('fr-FR')} · ${total} BUS</div></div>
+    <button class="btn" id="refreshBtn">↻ Actualiser</button></div>
+    <div class="kpi8">
+      ${kcrd('Total BUS',total,'#7c3aed','')} ${kcrd('En travaux',bySm[4]||0,'#f97316',total?Math.round((bySm[4]||0)/total*100)+'%':'')}
+      ${kcrd('Livrés',bySm[5]||0,'#10b981','')} ${kcrd('MES',bySm[6]||0,'#06b6d4','')}
+      ${kcrd('Risques ↑',riskHigh||0,'#ef4444','')} ${kcrd('Cmd fermes',cfCount||0,'#6d28d9','')}
+      ${kcrd('Mesures NOK',nokCount||0,'#f59e0b','')} ${kcrd('SIN3 non MAJ',sin3Nok||0,'#64748b','')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 240px;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="section-title">Répartition par état</div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <canvas id="donutChart" width="160" height="160" style="flex-shrink:0"></canvas>
+          <div style="flex:1">
+            ${Object.entries(SC).map(([k,v])=>{const n=bySm[k]||0;if(!n)return'';const c=CC[+k%CC.length];return`<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px"><div style="width:7px;height:7px;border-radius:2px;background:${c}"></div><span style="font-size:11px;color:var(--sub);flex:1">${v.s}</span><div style="flex:2">${pb(n,total,c)}</div><span style="font-size:11px;font-weight:600;min-width:14px;text-align:right">${n}</span></div>`;}).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">Avancement global</div>
+        <div style="text-align:center;padding:12px 0 16px">
+          <div style="font-size:44px;font-weight:700;color:var(--acc);line-height:1">${avGlobal||0}%</div>
+          <div style="font-size:12px;color:var(--sub);margin:4px 0 14px">avancement moyen</div>
+          ${pb(avGlobal||0,100)}
+        </div>
+        <div style="border-top:1px solid var(--brd);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${[1,2,3,4].map(e=>`<div style="text-align:center;padding:6px;background:var(--th);border-radius:6px"><div style="font-size:15px;font-weight:700">${bySm[e]||0}</div><div style="font-size:10px;color:var(--mut)">${SC[e].s}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    ${crit.length?`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-title" style="margin:0">🔴 Actions requises</div>
+        <span class="badge" style="background:rgba(239,68,68,.1);color:#ef4444">${crit.length}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+        ${crit.map(b=>`<div class="action-card" data-busid="${esc(b.id)}">
+          <div style="flex:1;min-width:0"><div class="mono" style="color:var(--acc);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.id)}</div><div style="font-size:10px;color:var(--mut)">${esc(b.rr)} · ${b.av}%</div></div>
+          <div style="display:flex;flex-direction:column;gap:3px">${sbadge(b.etat)}${rbadge(b.risque)}</div>
+        </div>`).join('')}
+      </div>
+    </div>`:''}
+  </div>`;
+}
+
+function pageKPI(){
+  const {byLot,avGlobal}=S.stats;
+  const okT=S.mesures.reduce((a,m)=>a+m.ok,0);
+  const nokT=S.mesures.reduce((a,m)=>a+m.nok,0);
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Dashboard KPI</div><div class="page-sub">Vue management · Indicateurs de performance</div></div></div>
+    <div class="kpi4">
+      ${krow('Taux livraison',S.bus.length?Math.round(S.bus.filter(b=>b.etat>=5).length/S.bus.length*100)+'%':0,'#10b981','✓',S.bus.filter(b=>b.etat>=5).length+'/'+S.bus.length)}
+      ${krow('Taux MES',S.bus.length?Math.round(S.bus.filter(b=>b.etat===6).length/S.bus.length*100)+'%':0,'#06b6d4','⚡','')}
+      ${krow('Mesures OK',(okT+nokT>0?Math.round(okT/(okT+nokT)*100):0)+'%','#3b82f6','📐','')}
+      ${krow('Avancement moy.',(avGlobal||0)+'%','#7c3aed','📈','')}
+    </div>
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="card"><div class="section-title">États BUS</div><canvas id="pieChart" height="220"></canvas></div>
+      <div class="card"><div class="section-title">Par Lot</div><canvas id="barChart" height="220"></canvas></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="section-title">Avancement / RR</div><canvas id="rrChart" height="190"></canvas></div>
+      <div class="card"><div class="section-title">Distribution états</div><canvas id="lotLineChart" height="190"></canvas></div>
+    </div>
+  </div>`;
+}
+
+function pageBUS(){
+  let rows=filterBus();
+  const PP=12,tp=Math.ceil(rows.length/PP);
+  const paged=rows.slice(S.pg*PP,(S.pg+1)*PP);
+  const rrs=[...new Set(S.bus.map(b=>b.rr).filter(Boolean))].sort();
+  const st=k=>S.sk===k?(S.sd>0?' ↑':' ↓'):'';
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">BUS / Topologies</div><div class="page-sub">${rows.length} résultats · ${S.bus.length} total</div></div>
+    <button class="btn" id="csvBtn">↓ CSV</button></div>
+    <div class="card" style="padding:10px;margin-bottom:12px">
+      <div class="flt-bar">
+        <input id="fq" placeholder="Rechercher..." value="${esc(S.fq)}" style="width:210px">
+        <select id="fl"><option value="">Tous lots</option>${['LOT1','LOT2','LOT3'].map(l=>`<option${S.fl===l?' selected':''}>${l}</option>`).join('')}</select>
+        <select id="fe"><option value="">Tous états</option>${Object.entries(SC).map(([k,v])=>`<option value="${k}"${S.fe==k?' selected':''}>${v.s}</option>`).join('')}</select>
+        <select id="fr"><option value="">Tous RR</option>${rrs.map(r=>`<option${S.fr===r?' selected':''}>${esc(r)}</option>`).join('')}</select>
+        <select id="fk"><option value="">Risques</option>${['Faible','Moyen','Élevé'].map(r=>`<option${S.fk===r?' selected':''}>${r}</option>`).join('')}</select>
+        ${(S.fq||S.fl||S.fe!==''||S.fr||S.fk)?'<button class="btn sm" id="clearFlt">✕</button>':''}
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          ${[['id','Topologie'],['lot','Lot'],['dor','DOR'],['ext','Extrémités'],['etat','État'],['av','Avancement'],['rr','RR'],['liv','Livraison'],['risque','Risque']].map(([k,l])=>`<th data-sort="${k}" style="color:${S.sk===k?'var(--acc)':'var(--sub)'}">${l}${st(k)}</th>`).join('')}
+        </tr></thead>
+        <tbody>${paged.map((b,i)=>`<tr class="trow ${i%2?'odd':'even'}" data-busid="${esc(b.id)}">
+          <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(b.id)}</span></td>
+          <td><span class="lot-badge">${b.lot}</span></td>
+          <td style="color:var(--sub);font-size:11px">${b.dor}</td>
+          <td style="color:var(--sub);max-width:175px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.ext)}</td>
+          <td>${sbadge(b.etat)}</td>
+          <td style="min-width:110px">${pb(b.av)}</td>
+          <td style="color:var(--sub);font-size:11px;white-space:nowrap">${esc(b.rr)}</td>
+          <td style="color:var(--sub);font-size:11px">${b.liv||'–'}</td>
+          <td>${rbadge(b.risque)}</td>
+        </tr>`).join('')}
+        ${!paged.length?'<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--mut)">Aucun résultat</td></tr>':''}</tbody>
+      </table></div>
+      ${tp>1?`<div class="tbl-foot"><span style="font-size:11px;color:var(--mut)">${rows.length} résultats · Page ${S.pg+1}/${tp}</span>
+        <div style="display:flex;gap:3px"><button class="pg-btn" id="pgPrev">‹</button>
+          ${Array.from({length:Math.min(5,tp)},(_,i)=>{const p2=Math.max(0,Math.min(S.pg-2,tp-5))+i;return`<button class="pg-btn${p2===S.pg?' active':''}" data-pg="${p2}">${p2+1}</button>`;}).join('')}
+        <button class="pg-btn" id="pgNext">›</button></div></div>`:''}
+    </div>
+  </div>`;
+}
+
+function pageDelivery(){
+  const COLS=[['topo','Topologie'],['lot','Lot'],['hRcv','HEPOC reçu'],['hF','HEPOC Free'],['hRnv','HEPOC renvoyé'],['cRcv','CPM reçu'],['cF','CPM Free'],['cRnv','CPM renvoyé'],['vO','Valid. Orange'],['cf','Cmd ferme']];
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Suivi Delivery</div><div class="page-sub">HEPOC · CPM · Commandes fermes</div></div></div>
+    <div class="kpi4" style="margin-bottom:16px">
+      ${krow('Cmd fermes',S.delivery.filter(d=>d.cf==='OUI').length,'#10b981','✓','')}
+      ${krow('En attente',S.delivery.filter(d=>d.cf==='NON').length,'#f59e0b','⏳','')}
+      ${krow('HEPOC ✓',S.delivery.filter(d=>d.hRnv==='OUI').length,'#3b82f6','📄','')}
+      ${krow('CPM ✓',S.delivery.filter(d=>d.cRnv==='OUI').length,'#7c3aed','📋','')}
+    </div>
+    <div class="tbl-wrap"><div style="overflow-x:auto"><table>
+      <thead><tr>${COLS.map(([,l])=>`<th>${l}</th>`).join('')}</tr></thead>
+      <tbody>${S.delivery.map((d,i)=>`<tr class="${i%2?'odd':'even'}">
+        <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(d.topo)}</span></td>
+        <td><span class="lot-badge">${d.lot}</span></td>
+        ${COLS.slice(2).map(([k])=>`<td>${obadge(d[k])}</td>`).join('')}
+      </tr>`).join('')}</tbody>
+    </table></div></div>
+  </div>`;
+}
+
+function pageTravaux(){
+  const trx=S.bus.filter(b=>[3,4,5].includes(b.etat));
+  if(S.view==='kanban'){
+    return `<div class="page">
+      <div class="page-hdr"><div><div class="page-title">Suivi Travaux</div></div>
+        <div style="display:flex;gap:4px"><button class="btn sm" id="vTable">📋 Tableau</button><button class="btn sm primary" id="vKanban">🗂 Kanban</button></div></div>
+      <div class="kanban">${[3,4,5].map(e=>{const items=S.bus.filter(b=>b.etat===e);return`<div class="kboard">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--brd)">${sbadge(e)}<span style="font-size:11px;color:var(--mut)">${items.length} BUS</span></div>
+        ${items.map(b=>`<div class="kcard" style="border-color:${b.risque==='Élevé'?'rgba(239,68,68,.25)':'var(--brd)'}">
+          <div class="mono" style="color:var(--acc);font-weight:600;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${esc(b.id)}</div>
+          <div style="font-size:11px;color:var(--mut);margin-bottom:6px">${esc(b.rr)}</div>${pb(b.av)}
+          <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:10px;color:var(--mut)">${b.liv||'–'}</span>${rbadge(b.risque)}</div>
+        </div>`).join('')}</div>`;}).join('')}</div>
+    </div>`;
+  }
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Suivi Travaux</div><div class="page-sub">Plans · Chantiers · Livraisons</div></div>
+      <div style="display:flex;gap:4px"><button class="btn sm primary" id="vTable">📋 Tableau</button><button class="btn sm" id="vKanban">🗂 Kanban</button></div></div>
+    <div class="kpi4" style="margin-bottom:16px">
+      ${krow('Éd. Plans',S.bus.filter(b=>b.etat===3).length,'#f59e0b','📄','')}
+      ${krow('En travaux',S.bus.filter(b=>b.etat===4).length,'#f97316','🏗','')}
+      ${krow('Livrés',S.bus.filter(b=>b.etat===5).length,'#10b981','✓','')}
+      ${krow('Risques ↑',trx.filter(b=>b.risque==='Élevé').length,'#ef4444','⚠','')}
+    </div>
+    <div class="tbl-wrap"><div style="overflow-x:auto"><table>
+      <thead><tr><th>Topologie</th><th>Lot</th><th>RR</th><th>État</th><th>Avancement</th><th>Livraison</th><th>Risque</th><th>Commentaire</th></tr></thead>
+      <tbody>${trx.map((b,i)=>`<tr class="trow ${i%2?'odd':'even'}" data-busid="${esc(b.id)}">
+        <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(b.id)}</span></td>
+        <td><span class="lot-badge">${b.lot}</span></td>
+        <td style="color:var(--sub);font-size:11px">${esc(b.rr)}</td>
+        <td>${sbadge(b.etat)}</td>
+        <td style="min-width:110px">${pb(b.av)}</td>
+        <td style="color:var(--sub);font-size:11px">${b.liv||'–'}</td>
+        <td>${rbadge(b.risque)}</td>
+        <td style="color:var(--mut);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.comment)||'–'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>
+  </div>`;
+}
+
+function pageMesures(){
+  const tot={nbT:S.mesures.reduce((a,m)=>a+m.nbT,0),nbM:S.mesures.reduce((a,m)=>a+m.nbM,0),ok:S.mesures.reduce((a,m)=>a+m.ok,0),nok:S.mesures.reduce((a,m)=>a+m.nok,0)};
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Suivi Mesures</div></div></div>
+    <div class="kpi4" style="margin-bottom:16px">
+      ${krow('Total tronçons',tot.nbT,'#6b7280','📏','')}
+      ${krow('Mesurés',tot.nbM,'#3b82f6','📊',tot.nbT?Math.round(tot.nbM/tot.nbT*100)+'%':'')}
+      ${krow('OK',tot.ok,'#10b981','✓','')}
+      ${krow('NOK',tot.nok,'#ef4444','✗','')}
+    </div>
+    <div class="tbl-wrap"><div style="overflow-x:auto"><table>
+      <thead><tr><th>Topologie</th><th>RR</th><th>Tronçons</th><th>Accès MOE</th><th>Mesurés</th><th>OK</th><th>NOK</th><th>Taux mesure</th><th>Taux échec</th></tr></thead>
+      <tbody>${S.mesures.map((m,i)=>{const tE=(m.ok+m.nok)?Math.round(m.nok/(m.ok+m.nok)*100):0;return`<tr class="${i%2?'odd':'even'}">
+        <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(m.topo)}</span></td>
+        <td style="color:var(--sub);font-size:11px">${esc(m.rr)}</td>
+        <td>${m.nbT}</td><td>${obadge(m.moe)}</td><td>${m.nbM}</td>
+        <td style="color:#10b981;font-weight:600">${m.ok}</td>
+        <td style="color:${m.nok?'#ef4444':'var(--mut)'};font-weight:${m.nok?600:400}">${m.nok}</td>
+        <td style="min-width:100px">${pb(m.nbM,m.nbT,'#3b82f6')}</td>
+        <td style="color:${tE>30?'#ef4444':'var(--mut)'};font-size:11px">${tE}%</td>
+      </tr>`;}).join('')}</tbody>
+    </table></div></div>
+  </div>`;
+}
+
+function pageCDD(){
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Suivi CDD</div><div class="page-sub">Commandes COL · SIN3 · PFTO</div></div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${krow('Total sites',S.cdd.length,'#6b7280','📍','')}
+      ${krow('PFTO lancé',S.cdd.filter(c=>c.pfto==='OUI').length,'#10b981','✓','')}
+      ${krow('SIN3 non MAJ',S.cdd.filter(c=>c.sin3==='NON').length,'#ef4444','⚠','')}
+    </div>
+    <div class="tbl-wrap"><div style="overflow-x:auto"><table>
+      <thead><tr><th>Topologie</th><th>Lot</th><th>Dept</th><th>RR</th><th>Site Code</th><th>Nom</th><th>Date MAD</th><th>N° commande</th><th>PFTO</th><th>SIN3</th><th>Commentaire</th></tr></thead>
+      <tbody>${S.cdd.map((c,i)=>`<tr class="${i%2?'odd':'even'}">
+        <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(c.topo)}</span></td>
+        <td><span class="lot-badge">${c.lot}</span></td>
+        <td style="color:var(--sub)">${c.dept}</td>
+        <td style="color:var(--sub);font-size:11px">${esc(c.rr)}</td>
+        <td><span class="mono">${c.sc}</span></td>
+        <td>${c.ns}</td>
+        <td style="color:var(--sub)">${c.mad}</td>
+        <td><span class="mono" style="font-size:10px">${c.cmd}</span></td>
+        <td>${obadge(c.pfto)}</td>
+        <td>${obadge(c.sin3)}</td>
+        <td style="color:var(--mut);font-size:11px">${esc(c.comment)||'–'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>
+  </div>`;
+}
+
+function pageEmpl(){
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Suivi Emplacements</div></div></div>
+    <div class="tbl-wrap"><div style="overflow-x:auto"><table>
+      <thead><tr><th>Topologie</th><th>Lot</th><th>Site</th><th>Dept</th><th>RR</th><th>Équipe</th><th>RDV</th><th>Annexe B</th><th>Install.</th><th>Consuel</th><th>Annexe C</th></tr></thead>
+      <tbody>${S.emplacements.map((e,i)=>`<tr class="${i%2?'odd':'even'}">
+        <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(e.topo)}</span></td>
+        <td><span class="lot-badge">${e.lot}</span></td>
+        <td><span class="mono">${e.site}</span></td>
+        <td style="color:var(--sub)">${e.dept}</td>
+        <td style="color:var(--sub);font-size:11px">${esc(e.rr)}</td>
+        ${[e.ep,e.rdv,e.aB,e.inst,e.cons,e.aC].map(v=>`<td>${obadge(v)}</td>`).join('')}
+      </tr>`).join('')}</tbody>
+    </table></div></div>
+  </div>`;
+}
+
+function pageImport(){
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Import Excel</div><div class="page-sub">SUIVI_PROJET_Collecte.xlsx · Les commentaires saisis manuellement sont préservés</div></div></div>
+    <div class="uploader" id="uploader"><input type="file" id="fileInput" accept=".xlsx" style="display:none">
+      <div style="font-size:36px;margin-bottom:10px">📥</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Glisser-déposer ou cliquer</div>
+      <div style="font-size:12px;color:var(--mut)">Fichiers .xlsx uniquement</div>
+    </div>
+    <div class="card"><div class="section-title">Onglets traités automatiquement</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${['Etat BUS','HME','Suivi TRAVAUX','SUIVI DELIVERY','Mesures','CDD','SUIVI EMPLACEMENT'].map(s=>`<span style="font-size:11px;padding:3px 10px;border-radius:6px;background:var(--al);color:var(--acc);font-weight:500">${s}</span>`).join('')}
+      </div>
+    </div>
+    <div id="importReport"></div>
+  </div>`;
+}
+
+function pageSettings(){
+  return `<div class="page">
+    <div class="page-hdr"><div><div class="page-title">Paramétrage</div></div></div>
+    <div class="grid2" style="max-width:680px">
+      <div class="card"><div class="section-title">États BUS</div>
+        ${Object.entries(SC).map(([k,v])=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--brd)"><span style="font-size:11px;font-weight:600;color:var(--mut);min-width:12px">${k}</span>${sbadge(+k)}</div>`).join('')}
+      </div>
+      <div class="card"><div class="section-title">Informations système</div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:8px">Base de données : SQLite (locale)</div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:8px">BUS en base : <strong>${S.bus.length}</strong></div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:8px">Delivery : <strong>${S.delivery.length}</strong></div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:16px">Mesures : <strong>${S.mesures.length}</strong></div>
+        <div style="padding:10px;background:var(--al);border-radius:8px;font-size:11px;color:var(--sub)">
+          Gestion des utilisateurs et droits d'accès → prochaine version.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── MODAL ─────────────────────────────────────────
+async function showModal(busId){
+  const b=S.bus.find(x=>x.id===busId); if(!b) return;
+  S.modal=b; S.modalTab='synthese';
+  let history=[],comments=[];
+  try{ [history,comments]=await Promise.all([api.get('/api/history/'+encodeURIComponent(busId)),api.get('/api/comments/'+encodeURIComponent(busId))]); }catch(e){}
+  S.modalHistory=history; S.modalComments=comments;
+  renderModal();
+}
+
+function renderModal(){
+  const b=S.modal; if(!b) return;
+  const d=S.delivery.find(x=>x.topo===b.id);
+  const ms=S.mesures.filter(x=>x.topo===b.id);
+  const cd=S.cdd.filter(x=>x.topo===b.id);
+  const em=S.emplacements.filter(x=>x.topo===b.id);
+  const TABS=['synthese','delivery','mesures','cdd','emplacements','historique'];
+
+  let tabBody='';
+  if(S.modalTab==='synthese') tabBody=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div><div style="font-size:11px;color:var(--sub);margin-bottom:6px;text-transform:uppercase">État actuel</div>
+      <select id="metat" style="width:100%">${Object.entries(SC).map(([k,v])=>`<option value="${k}"${b.etat==k?' selected':''}>${v.s}</option>`).join('')}</select></div>
+    <div><div style="font-size:11px;color:var(--sub);margin-bottom:4px">Avancement</div>
+      <div style="font-size:28px;font-weight:700;color:var(--acc);margin-bottom:6px">${b.av}%</div>${pb(b.av)}</div>
+    <div><div style="font-size:11px;color:var(--sub);margin-bottom:3px">Livraison</div><div style="font-weight:600">${b.liv||'–'}</div></div>
+    <div><div style="font-size:11px;color:var(--sub);margin-bottom:3px">MES</div><div style="font-weight:600">${b.mes||'–'}</div></div>
+    <div style="grid-column:1/-1"><div style="font-size:11px;color:var(--sub);margin-bottom:6px">Commentaire</div>
+      <textarea id="mcmt" rows="3" style="width:100%;resize:vertical">${esc(b.comment)}</textarea></div>
+    <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" id="mCancel">Annuler</button>
+      <button class="btn primary" id="mSave">✓ Enregistrer</button>
+    </div>
+  </div>`;
+  else if(S.modalTab==='delivery') tabBody=d?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+    ${[['HEPOC reçu Orange','hRcv'],['HEPOC complété Free','hF'],['HEPOC renvoyé','hRnv'],['CPM reçu Orange','cRcv'],['CPM complété Free','cF'],['CPM renvoyé','cRnv'],['Validation Orange','vO'],['Commande ferme','cf']].map(([l,k])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--brd)"><span style="font-size:12px;color:var(--sub)">${l}</span>
+      <select data-dlvkey="${k}" style="padding:3px 6px;font-size:11px;width:110px"><option${d[k]==='OUI'?' selected':''}>OUI</option><option${d[k]==='NON'?' selected':''}>NON</option><option${d[k]==='En cours'?' selected':''}>En cours</option><option${d[k]==='En attente'?' selected':''}>En attente</option></select>
+    </div>`).join('')}
+    <div style="grid-column:1/-1;display:flex;justify-content:flex-end;padding-top:8px"><button class="btn primary" id="saveDlv">✓ Enregistrer delivery</button></div>
+  </div>`:'<div style="text-align:center;padding:28px;color:var(--mut)">Aucune donnée delivery pour ce BUS</div>';
+  else if(S.modalTab==='mesures') tabBody=ms.length?ms.map(m=>`<div style="padding:13px;background:var(--th);border-radius:8px;margin-bottom:10px;border:1px solid var(--brd)">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
+      ${[['Total',m.nbT,'#6b7280'],['Mesurés',m.nbM,'#3b82f6'],['OK',m.ok,'#10b981'],['NOK',m.nok,'#ef4444']].map(([l,v,c])=>`<div><div style="font-size:10px;color:var(--mut)">${l}</div><div style="font-size:20px;font-weight:700;color:${c}">${v}</div></div>`).join('')}
+    </div>${pb(m.nbM,m.nbT,'#3b82f6')}</div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--mut)">Aucune mesure</div>';
+  else if(S.modalTab==='cdd') tabBody=cd.length?cd.map(c=>`<div style="padding:13px;background:var(--th);border-radius:8px;margin-bottom:10px;border:1px solid var(--brd)">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span class="mono" style="color:var(--acc);font-weight:700">${c.sc}</span><span style="color:var(--sub);font-size:12px">${c.ns}</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--sub)">Commande</span><span class="mono" style="font-size:10px">${c.cmd}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--sub)">MAD</span><span>${c.mad}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--sub)">PFTO</span>${obadge(c.pfto)}</div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--sub)">SIN3</span>${obadge(c.sin3)}</div>
+    </div></div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--mut)">Aucun CDD</div>';
+  else if(S.modalTab==='emplacements') tabBody=em.length?em.map(e=>`<div style="padding:13px;background:var(--th);border-radius:8px;margin-bottom:10px;border:1px solid var(--brd)">
+    <div class="mono" style="color:var(--acc);font-weight:700;margin-bottom:10px">${e.site} · Dept ${e.dept}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      ${[['Équipe',e.ep],['RDV',e.rdv],['Annexe B',e.aB],['Installation',e.inst],['Consuel',e.cons],['Annexe C',e.aC]].map(([l,v])=>`<div><div style="font-size:10px;color:var(--mut);margin-bottom:3px">${l}</div>${obadge(v)}</div>`).join('')}
+    </div></div>`).join(''):'<div style="text-align:center;padding:28px;color:var(--mut)">Aucun emplacement</div>';
+  else tabBody=`
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Historique des modifications</div>
+      ${(S.modalHistory||[]).slice(0,15).map(h=>`<div class="history-item">
+        <span style="color:var(--sub);font-size:10px">${h.created_at}</span>
+        <span style="font-weight:500;color:var(--text);margin:0 6px">${h.field}</span>
+        <span style="color:var(--mut)">${h.old_val}</span>
+        <span style="color:var(--sub)"> → </span>
+        <span style="color:var(--acc)">${h.new_val}</span>
+        <span style="color:var(--mut);font-size:10px;margin-left:6px">par ${h.user_name}</span>
+      </div>`).join('') || '<div style="color:var(--mut)">Aucune modification enregistrée</div>'}
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Commentaires équipe</div>
+      ${(S.modalComments||[]).map(c=>`<div style="padding:8px;background:var(--th);border-radius:6px;margin-bottom:6px;border:1px solid var(--brd)">
+        <div style="font-size:10px;color:var(--mut);margin-bottom:3px">${c.created_at} · ${esc(c.author)}</div>
+        <div style="font-size:12px">${esc(c.body)}</div>
+      </div>`).join('') || '<div style="color:var(--mut);font-size:12px">Aucun commentaire</div>'}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <textarea id="newComment" rows="2" style="flex:1;resize:none;font-size:12px" placeholder="Ajouter un commentaire..."></textarea>
+        <button class="btn primary" id="postComment" style="align-self:flex-end">Envoyer</button>
+      </div>
+    </div>`;
+
+  const mo=document.getElementById('mo-overlay');
+  mo.className='open';
+  mo.innerHTML=`<div class="modal">
+    <div class="modal-hdr">
+      <div><div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:2px">${b.lot} · ${b.dor}</div>
+        <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${esc(b.id)}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.75);margin-bottom:6px">${esc(b.ext)}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">${sbadge(b.etat)}${rbadge(b.risque)}<span style="font-size:11px;color:rgba(255,255,255,.7)">RR: ${esc(b.rr)}</span></div>
+      </div>
+      <button id="mClose" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div class="modal-tabs">${TABS.map(t=>`<button class="modal-tab${S.modalTab===t?' active':''}" data-mtab="${t}">${t}</button>`).join('')}</div>
+    <div class="modal-body">${tabBody}</div>
+  </div>`;
+}
+
+// ── CHARTS ───────────────────────────────────────
+function initCharts(){
+  destroyCharts();
+  const dk=S.dark;
+  const tc={color:dk?'#94a3b8':'#6b7280'};
+  const gb={grid:{color:dk?'#1e293b':'#f0f2f7'},ticks:tc};
+  const no={display:false};
+
+  if(S.page==='prod'){
+    const el=document.getElementById('donutChart'); if(!el) return;
+    const byS=Object.fromEntries((S.stats.byEtat||[]).map(r=>[r.etat,r.count]));
+    const labels=Object.values(SC).map(v=>v.s);
+    const data=Object.keys(SC).map(k=>byS[k]||0);
+    S.charts.d=new Chart(el,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:CC,borderWidth:0}]},options:{responsive:false,plugins:{legend:{display:false}},cutout:'65%'}});
+  }
+
+  if(S.page==='kpi'){
+    const byS=Object.fromEntries((S.stats.byEtat||[]).map(r=>[r.etat,r.count]));
+    const pie=document.getElementById('pieChart');
+    if(pie) S.charts.pie=new Chart(pie,{type:'doughnut',data:{labels:Object.values(SC).map(v=>v.s),datasets:[{data:Object.keys(SC).map(k=>byS[k]||0),backgroundColor:CC,borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10},color:tc.color}}},cutout:'55%'}});
+
+    const bar=document.getElementById('barChart');
+    if(bar){
+      const bl=S.stats.byLot||[];
+      S.charts.bar=new Chart(bar,{type:'bar',data:{labels:bl.map(b=>b.lot),datasets:[{label:'Total',data:bl.map(b=>b.total),backgroundColor:dk?'#2d1b69':'#ddd6fe',borderRadius:4},{label:'Travaux',data:bl.map(b=>b.trx),backgroundColor:'#f97316',borderRadius:4},{label:'Livrés',data:bl.map(b=>b.livres||b.liv||0),backgroundColor:'#10b981',borderRadius:4}]},options:{responsive:true,plugins:{legend:{labels:{font:{size:10},color:tc.color}}},scales:{x:{...gb,grid:{display:false}},y:gb}}});
+    }
+
+    const rrc=document.getElementById('rrChart');
+    if(rrc){
+      const rrs=[...new Set(S.bus.map(b=>b.rr).filter(Boolean))].map(rr=>({rr:rr.split(' ')[0],av:Math.round(S.bus.filter(b=>b.rr===rr).reduce((a,b)=>a+b.av,0)/Math.max(1,S.bus.filter(b=>b.rr===rr).length))})).sort((a,b)=>b.av-a.av).slice(0,8);
+      S.charts.rr=new Chart(rrc,{type:'bar',data:{labels:rrs.map(r=>r.rr),datasets:[{data:rrs.map(r=>r.av),backgroundColor:dk?'#a78bfa':'#7c3aed',borderRadius:[0,4,4,0]}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{max:100,...gb,ticks:{...tc,callback:v=>v+'%'}},y:{grid:{display:false},ticks:tc}}}});
+    }
+
+    const lc=document.getElementById('lotLineChart');
+    if(lc){
+      const lots=S.stats.byLot||[];
+      S.charts.ll=new Chart(lc,{type:'bar',data:{labels:lots.map(b=>b.lot),datasets:[{label:'Avancement moy.',data:lots.map(b=>b.avMoy||0),backgroundColor:CC[0],borderRadius:4,yAxisID:'y'},{label:'BUS total',data:lots.map(b=>b.total),backgroundColor:CC[1],borderRadius:4,yAxisID:'y2'}]},options:{responsive:true,plugins:{legend:{labels:{font:{size:10},color:tc.color}}},scales:{y:{...gb,ticks:{...tc,callback:v=>v+'%'},max:100},y2:{position:'right',ticks:tc,grid:{display:false}}}}});
+    }
+  }
+}
+
+// ── RENDER ────────────────────────────────────────
+const PAGES={prod:pageProd,kpi:pageKPI,bus:pageBUS,delivery:pageDelivery,travaux:pageTravaux,mesures:pageMesures,cdd:pageCDD,empl:pageEmpl,import:pageImport,settings:pageSettings};
+
+function renderMain(){
+  document.getElementById('main').innerHTML=(PAGES[S.page]||pageProd)();
+  setTimeout(()=>{ initCharts(); bindPageEvents(); }, 10);
+}
+
+async function navigate(page){
+  S.page=page; S.pg=0;
+  renderSidebar(); renderMain();
+}
+
+function filterBus(){
+  let r=[...S.bus];
+  if(S.fq) r=r.filter(b=>(b.id+b.ext+b.rr).toLowerCase().includes(S.fq.toLowerCase()));
+  if(S.fl) r=r.filter(b=>b.lot===S.fl);
+  if(S.fe!=='') r=r.filter(b=>b.etat===+S.fe);
+  if(S.fr) r=r.filter(b=>b.rr===S.fr);
+  if(S.fk) r=r.filter(b=>b.risque===S.fk);
+  return r.sort((a,b)=>typeof a[S.sk]==='number'?(a[S.sk]-b[S.sk])*S.sd:String(a[S.sk]||'').localeCompare(String(b[S.sk]||''))*S.sd);
+}
+
+// ── EVENTS ────────────────────────────────────────
+function bindPageEvents(){
+  document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',()=>navigate(el.dataset.page)));
+
+  const tb=document.getElementById('themeBtn');
+  if(tb) tb.addEventListener('click',()=>{S.dark=!S.dark;document.body.classList.toggle('dk',S.dark);localStorage.setItem('nc_dark',S.dark?'1':'');renderSidebar();renderMain();});
+
+  const ub=document.getElementById('userBtn');
+  if(ub) ub.addEventListener('click',()=>{const u=prompt('Votre prénom / identifiant :',S.userName);if(u){S.userName=u;localStorage.setItem('nc_user',u);renderSidebar();}});
+
+  const rb=document.getElementById('refreshBtn');
+  if(rb) rb.addEventListener('click',async()=>{await loadAll();renderMain();notify('Données actualisées');});
+
+  document.querySelectorAll('th[data-sort]').forEach(el=>el.addEventListener('click',()=>{const k=el.dataset.sort;if(S.sk===k)S.sd*=-1;else{S.sk=k;S.sd=1;}S.pg=0;renderMain();}));
+  document.querySelectorAll('[data-busid]').forEach(el=>el.addEventListener('click',()=>showModal(el.dataset.busid)));
+
+  ['fq','fl','fe','fr','fk'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',()=>{S[id]=el.value;S.pg=0;renderMain();});});
+  const cf=document.getElementById('clearFlt');if(cf)cf.addEventListener('click',()=>{S.fq='';S.fl='';S.fe='';S.fr='';S.fk='';S.pg=0;renderMain();});
+  const pp=document.getElementById('pgPrev');if(pp)pp.addEventListener('click',()=>{S.pg=Math.max(0,S.pg-1);renderMain();});
+  const pn=document.getElementById('pgNext');if(pn)pn.addEventListener('click',()=>{const tp=Math.ceil(filterBus().length/12);S.pg=Math.min(tp-1,S.pg+1);renderMain();});
+  document.querySelectorAll('[data-pg]').forEach(el=>el.addEventListener('click',()=>{S.pg=+el.dataset.pg;renderMain();}));
+
+  const vt=document.getElementById('vTable');if(vt)vt.addEventListener('click',()=>{S.view='table';renderMain();});
+  const vk=document.getElementById('vKanban');if(vk)vk.addEventListener('click',()=>{S.view='kanban';renderMain();});
+
+  const csvBtn=document.getElementById('csvBtn');
+  if(csvBtn) csvBtn.addEventListener('click',()=>{const h='ID,Lot,DOR,Extrémités,État,Av%,RR,Livraison,MES,Risque';const r=filterBus().map(b=>`${b.id},${b.lot},${b.dor},"${b.ext}",${SC[b.etat].s},${b.av},${b.rr},${b.liv||''},${b.mes||''},${b.risque}`);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h,...r].join('\n')],{type:'text/csv'}));a.download='bus.csv';a.click();});
+
+  // Import
+  const up=document.getElementById('uploader');
+  if(up){
+    up.addEventListener('click',()=>document.getElementById('fileInput')?.click());
+    up.addEventListener('dragover',e=>{e.preventDefault();up.classList.add('drag');});
+    up.addEventListener('dragleave',()=>up.classList.remove('drag'));
+    up.addEventListener('drop',e=>{e.preventDefault();up.classList.remove('drag');handleImport(e.dataTransfer.files[0]);});
+    const fi=document.getElementById('fileInput');if(fi)fi.addEventListener('change',e=>handleImport(e.target.files[0]));
+  }
+}
+
+async function handleImport(file){
+  if(!file) return;
+  const rpt=document.getElementById('importReport'); if(!rpt) return;
+  rpt.innerHTML='<div style="padding:16px;text-align:center"><span class="spinner"></span> Import en cours...</div>';
+  try{
+    const fd=new FormData(); fd.append('file',file);
+    const result=await api.upload('/api/import',fd);
+    rpt.innerHTML=`<div class="card" style="margin-top:14px">
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px">✅ Import terminé</div>
+      <div class="kpi4" style="margin-bottom:14px">
+        ${krow('Nouveaux BUS',result.imported,'#10b981','✓','')}
+        ${krow('Mis à jour',result.updated,'#3b82f6','↑','')}
+        ${krow('Onglets lus',Object.keys(result.sheets||{}).length,'#7c3aed','📄','')}
+        ${krow('Avertissements',(result.warnings||[]).length,'#f59e0b','⚠','')}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${Object.entries(result.sheets||{}).map(([k,v])=>`<span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(16,185,129,.1);color:#10b981;font-weight:500">${k} (${v} lignes)</span>`).join('')}
+      </div>
+      ${(result.warnings||[]).slice(0,5).map(w=>`<div style="font-size:12px;color:#f59e0b;margin-bottom:3px">⚠ ${esc(w)}</div>`).join('')}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn primary" onclick="loadAll().then(()=>navigate('bus'))">→ Voir les BUS importés</button>
+      </div>
+    </div>`;
+    await loadAll();
+  }catch(e){ rpt.innerHTML=`<div style="color:#ef4444;padding:12px">Erreur: ${e.message}</div>`; }
+}
+
+// Modal events
+document.getElementById('mo-overlay').addEventListener('click',async e=>{
+  const t=e.target;
+  if(t===document.getElementById('mo-overlay')||t.id==='mClose'){document.getElementById('mo-overlay').className='';S.modal=null;return;}
+  if(t.dataset.mtab){S.modalTab=t.dataset.mtab;renderModal();return;}
+  if(t.id==='mCancel'){document.getElementById('mo-overlay').className='';S.modal=null;return;}
+  if(t.id==='mSave'){
+    const etat=+document.getElementById('metat')?.value;
+    const comment=document.getElementById('mcmt')?.value||'';
+    try{
+      const updated=await api.put('/api/bus/'+encodeURIComponent(S.modal.id),{etat,comment,user:S.userName});
+      const i=S.bus.findIndex(b=>b.id===S.modal.id);if(i>=0)S.bus[i]=updated;
+      S.modal=updated;
+      notify('BUS mis à jour');
+      document.getElementById('mo-overlay').className=''; S.modal=null;
+      await loadAll(); renderMain();
+    }catch(er){notify('Erreur: '+er.message,'error');}
+    return;
+  }
+  if(t.id==='saveDlv'){
+    const fields={};
+    document.querySelectorAll('[data-dlvkey]').forEach(el=>fields[el.dataset.dlvkey]=el.value);
+    fields.lot=S.modal.lot;
+    try{ await api.put('/api/delivery/'+encodeURIComponent(S.modal.id),fields);
+      const i=S.delivery.findIndex(d=>d.topo===S.modal.id);
+      if(i>=0)Object.assign(S.delivery[i],fields); else S.delivery.push({topo:S.modal.id,...fields});
+      notify('Delivery mis à jour');
+    }catch(er){notify('Erreur: '+er.message,'error');}
+    return;
+  }
+  if(t.id==='postComment'){
+    const body=document.getElementById('newComment')?.value?.trim();
+    if(!body) return;
+    try{ const c=await api.post('/api/comments/'+encodeURIComponent(S.modal.id),{body,author:S.userName});
+      S.modalComments=[c,...(S.modalComments||[])];
+      renderModal(); notify('Commentaire ajouté');
+    }catch(er){notify('Erreur: '+er.message,'error');}
+    return;
+  }
+});
+
+// ── INIT ─────────────────────────────────────────
+(async()=>{
+  if(localStorage.getItem('nc_dark')==='1'){S.dark=true;document.body.classList.add('dk');}
+  await loadAll();
+  renderSidebar();
+  renderMain();
+})();
+</script>
+</body>
+</html>

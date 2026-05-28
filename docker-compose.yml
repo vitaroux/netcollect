@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  netcollect:
+    build: .
+    container_name: netcollect
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data   # Base SQLite persistée sur le serveur
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
