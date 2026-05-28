@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const TABLES = ['bus','delivery','mesures','cdd','emplacements','history','comments'];
+const TABLES = ['bus','delivery','mesures','cdd','emplacements','history','comments','cpm'];
 
 function loadTable(name) {
   const file = path.join(DATA_DIR, name + '.json');
@@ -495,4 +495,182 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname,'public','index.html
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✅  NetCollect → http://localhost:${PORT}`);
   console.log(`📁  Données   → ${DATA_DIR}\n`);
+});
+
+// ═══════════════════════════════════════════════
+// MODULE CPM / CRMAD
+// ═══════════════════════════════════════════════
+
+// ── GET liste CPM ──────────────────────────────
+app.get('/api/cpm', (req, res) => {
+  res.json(loadTable('cpm').sort((a,b) => a.topo.localeCompare(b.topo)));
+});
+
+app.get('/api/cpm/:topo', (req, res) => {
+  const row = loadTable('cpm').find(c => c.topo === req.params.topo);
+  if (!row) return res.status(404).json({ error: 'CPM introuvable' });
+  res.json(row);
+});
+
+// ── PUT mise à jour manuelle CPM ───────────────
+app.put('/api/cpm/:topo', (req, res) => {
+  const db  = getDB();
+  if (!db.cpm) db.cpm = [];
+  const f   = req.body;
+  const idx = db.cpm.findIndex(c => c.topo === req.params.topo);
+  if (idx < 0) return res.status(404).json({ error: 'CPM introuvable' });
+  const user = f.user || 'système';
+  ['statut','commentaire','date_reception','anomalies'].forEach(k => {
+    if (f[k] !== undefined) {
+      logHistory(db, 'cpm', req.params.topo, k, db.cpm[idx][k], f[k], user);
+      db.cpm[idx][k] = f[k];
+    }
+  });
+  db.cpm[idx].updated_at = now();
+  saveTable('cpm', db.cpm);
+  res.json(db.cpm[idx]);
+});
+
+// ── IMPORT fichier CPM (CRMAD) par BUS ─────────
+// Structure réelle du fichier CRMAD_global_XXX_TOPO_DATE.xlsx :
+//   Onglet CPM   : ligne1=headers synthèse, ligne2=données synthèse (topo/commandes/date CRMAD)
+//                  ligne3-4=headers segments, ligne5=vide, ligne6+=données segments
+//   Onglet RecapMAD : ligne1=headers, ligne2+=codes sites + nb FO
+//   Onglet HEPOC-Empl_Ener : ligne1=headers, ligne2+=sites HEPOC avec détails
+app.post('/api/import/cpm', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+
+    // ── 1. Onglet CPM : synthèse + segments ──
+    const cpmSheet = wb.Sheets['CPM'];
+    if (!cpmSheet) return res.status(400).json({ error: "Onglet 'CPM' introuvable dans ce fichier" });
+
+    // Lire les données brutes en tableau de tableaux
+    const cpmRaw = XLSX.utils.sheet_to_json(cpmSheet, { header:1, defval: null });
+
+    // Ligne 2 (index 1) = données de synthèse
+    const synth = cpmRaw[1] || [];
+    const topo          = clean(synth[1]);
+    const ref_commande  = clean(synth[2]);
+    const date_crmad    = synth[3] ? clean(String(synth[3])).slice(0,10) : '';
+
+    if (!topo) return res.status(400).json({ error: 'Topologie introuvable dans la cellule B2 du fichier CPM' });
+
+    // Lignes 6+ (index 5+) = segments — skip lignes vides et ligne d'en-tête parasite
+    const segments = [];
+    for (let i = 5; i < cpmRaw.length; i++) {
+      const r = cpmRaw[i];
+      if (!r[1] || r[1] === 'Reference Regroupement') continue;
+      const type = clean(r[5]);
+      // Ne garder que les types CPM réels (CPM_NRO_CO, CPM_CO_CO, etc.)
+      // Les autres lignes avec un COL01... dans col5 sont des lignes de référence fibre
+      segments.push({
+        ref_seg:   clean(r[4]),
+        sous_ref:  clean(r[2]),
+        date_mesc: clean(r[3]) ? clean(String(r[3])).slice(0,10) : '',
+        type:      type,
+        gtr:       clean(r[6]),
+        longueur:  parseInt(r[7]) || 0,
+        ext_a:     clean(r[10]),
+        ext_b:     clean(r[12]),
+      });
+    }
+
+    // Compter segments CPM réels (type CPM_xxx)
+    const segmentsCPM = segments.filter(s => s.type && s.type.startsWith('CPM_'));
+    const longueurTotale = segmentsCPM.reduce((a,s) => a + s.longueur, 0);
+
+    // ── 2. Onglet RecapMAD : sites + nb FO ──
+    const sites = [];
+    const recapSheet = wb.Sheets['RecapMAD'];
+    if (recapSheet) {
+      const recapRaw = XLSX.utils.sheet_to_json(recapSheet, { header:1, defval: null });
+      for (let i = 1; i < recapRaw.length; i++) {
+        const r = recapRaw[i];
+        const code = clean(r[0]);
+        const nbFO = parseInt(r[1]) || 0;
+        if (code && code !== 'Old BPU' && !code.includes('BPU') && nbFO > 0) {
+          sites.push({ code, nb_fo: nbFO });
+        }
+      }
+    }
+    const nbFOTotal = sites.reduce((a,s) => a + s.nb_fo, 0);
+
+    // ── 3. Onglet HEPOC-Empl_Ener : détails sites ──
+    const hepoc = [];
+    const hepocSheet = wb.Sheets['HEPOC-Empl_Ener'];
+    if (hepocSheet) {
+      const hepocRows = XLSX.utils.sheet_to_json(hepocSheet, { defval: null });
+      hepocRows.forEach(r => {
+        const topo_h = clean(r['operateurnumerocommande']);
+        if (!topo_h || topo_h === 'operateurnumerocommande') return;
+        hepoc.push({
+          code_site:  clean(r['Code_site']),
+          nom_site:   clean(r['nom_site']),
+          cp:         clean(r['lbetablissementcdpostal']),
+          type_site:  clean(r['type_site']),
+          date_mes:   clean(r['datemescommercial']) ? clean(String(r['datemescommercial'])).slice(0,10) : '',
+          cmd:        clean(r['nocommandefci']),
+          gti:        clean(r['GTI']),
+          type_acces: clean(r['type_acces']),
+          etat_baie1: clean(r['cdetatprestation_baie1']),
+          type_emp:   clean(r['type_emp_baie1']),
+        });
+      });
+    }
+
+    // ── 4. Upsert dans la table CPM ──
+    const db  = getDB();
+    if (!db.cpm) db.cpm = [];
+    const idx = db.cpm.findIndex(c => c.topo === topo);
+    const row = {
+      topo,
+      ref_client:    topo,
+      ref_commande,
+      date_crmad,
+      statut:        'CRMAD reçu',
+      commentaire:   '',
+      date_reception: now().slice(0,10),
+      anomalies:     '',
+      nb_segments:   segmentsCPM.length,
+      nb_segments_total: segments.length,
+      nb_sites:      sites.length,
+      nb_fo_total:   nbFOTotal,
+      longueur_totale: longueurTotale,
+      segments:      segments.slice(0, 200), // max 200 pour perf
+      sites:         sites,
+      hepoc,
+      imported_at:   now(),
+      updated_at:    now(),
+    };
+    if (idx >= 0) {
+      // Préserver les champs saisis manuellement
+      row.statut        = db.cpm[idx].statut || row.statut;
+      row.commentaire   = db.cpm[idx].commentaire || '';
+      row.anomalies     = db.cpm[idx].anomalies || '';
+      db.cpm[idx] = row;
+    } else {
+      db.cpm.push(row);
+    }
+    saveTable('cpm', db.cpm);
+
+    // Mettre à jour le BUS associé : marquer CRMAD reçu
+    const bidx = db.bus.findIndex(b => b.id === topo);
+    if (bidx >= 0 && db.bus[bidx].etat < 4) {
+      db.bus[bidx].etat = 4; // En travaux si on a le CRMAD
+      db.bus[bidx].updated_at = now();
+      saveTable('bus', db.bus);
+    }
+
+    res.json({
+      ok: true, topo, nb_segments: segmentsCPM.length,
+      nb_sites: sites.length, nb_fo_total: nbFOTotal,
+      longueur_totale: longueurTotale,
+    });
+
+  } catch(e) {
+    console.error('CPM import error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
