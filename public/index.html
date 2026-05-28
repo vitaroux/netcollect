@@ -241,7 +241,7 @@ select option{background:var(--card)}
 const SC={0:{s:'Non démarré',v:'t0'},1:{s:'Design',v:'t1'},2:{s:'Delivery',v:'t2'},3:{s:'Éd. Plans',v:'t3'},4:{s:'Travaux',v:'t4'},5:{s:'Livré',v:'t5'},6:{s:'MES',v:'t6'}};
 const RC={Faible:{bg:'var(--t5bg)',c:'var(--t5c)'},Moyen:{bg:'var(--t3bg)',c:'var(--t3c)'},Élevé:{bg:'rgba(239,68,68,.1)',c:'#ef4444'}};
 const CC=['#7c3aed','#3b82f6','#06b6d4','#10b981','#f59e0b','#f97316','#ef4444'];
-const NAV_ALL=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Dashboard KPI',g:'Dashboards',i:'📊'},{id:'bus',l:'BUS / Topologies',g:'Modules',i:'🔌'},{id:'delivery',l:'Delivery',g:'Modules',i:'📦'},{id:'travaux',l:'Travaux',g:'Modules',i:'🏗'},{id:'mesures',l:'Mesures',g:'Modules',i:'📐'},{id:'cdd',l:'CDD',g:'Modules',i:'📋'},{id:'empl',l:'Emplacements',g:'Modules',i:'📍'},{id:'cpm',l:'CPM / CRMAD',g:'Modules',i:'📡'},{id:'users',l:'Utilisateurs',g:'Config',i:'👥'},{id:'import',l:'Import Excel',g:'Config',i:'📥'},{id:'settings',l:'Paramétrage',g:'Config',i:'⚙'}];
+const NAV_ALL=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Dashboard KPI',g:'Dashboards',i:'📊'},{id:'ia',l:'Dashboard Direction',g:'Dashboards',i:'🎯'},{id:'bus',l:'BUS / Topologies',g:'Modules',i:'🔌'},{id:'delivery',l:'Delivery',g:'Modules',i:'📦'},{id:'travaux',l:'Travaux',g:'Modules',i:'🏗'},{id:'mesures',l:'Mesures',g:'Modules',i:'📐'},{id:'cdd',l:'CDD',g:'Modules',i:'📋'},{id:'empl',l:'Emplacements',g:'Modules',i:'📍'},{id:'cpm',l:'CPM / CRMAD',g:'Modules',i:'📡'},{id:'users',l:'Utilisateurs',g:'Config',i:'👥'},{id:'import',l:'Import Excel',g:'Config',i:'📥'},{id:'settings',l:'Paramétrage',g:'Config',i:'⚙'}];
 function getNav(){ const p=S.currentUser?.profil; if(p==='Pilote'||p==='CDP'||p==='CDR'||p==='BE') return NAV_ALL.filter(n=>n.id!=='users'); return NAV_ALL; }
 
 // ── STATE ────────────────────────────────────────
@@ -1020,6 +1020,243 @@ function buildTopoSchema(segs, hepoc, cpmData){
       <g id="legend">${legend}</g>
     </svg>
   </div>`;
+}
+
+
+// ═══════════════════════════════════════════════
+// DASHBOARD DIRECTION
+// ═══════════════════════════════════════════════
+function pageIA(){
+  const {byLot,avGlobal,byEtat,cfCount,nokCount,sin3Nok,riskHigh}=S.stats;
+  const total   = S.bus.length||1;
+  const livres  = S.bus.filter(b=>b.etat>=5).length;
+  const mes_    = S.bus.filter(b=>b.etat===6).length;
+  const travaux = S.bus.filter(b=>b.etat===4).length;
+  const design  = S.bus.filter(b=>b.etat<=2).length;
+  const plans   = S.bus.filter(b=>b.etat===3).length;
+  const byS     = Object.fromEntries((byEtat||[]).map(r=>[r.etat,r.count]));
+  const lots    = byLot||[];
+
+  // Taux d'avancement global (livré+MES / total)
+  const txLiv   = Math.round(livres/total*100);
+  const txMES   = Math.round(mes_/total*100);
+  const txTrx   = Math.round(travaux/total*100);
+  const txCF    = S.delivery.length ? Math.round(cfCount/S.delivery.length*100) : 0;
+
+  // Score de santé global (0-100)
+  const healthScore = Math.round(
+    txLiv * 0.4 +
+    txCF  * 0.2 +
+    (riskHigh===0?20:riskHigh<5?10:0) +
+    (nokCount===0?10:nokCount<10?5:0) +
+    (sin3Nok/Math.max(1,S.cdd.length)<0.3?10:0)
+  );
+  function healthColor(s){ return s>=70?'#10b981':s>=40?'#f59e0b':'#ef4444'; }
+  function healthLabel(s){ return s>=70?'Bonne santé':s>=40?'Attention requise':'En difficulté'; }
+  function healthIcon(s) { return s>=70?'✅':s>=40?'⚠️':'🔴'; }
+
+  // RAG par lot
+  function lotRAG(lot){
+    const av = lot.avMoy||0;
+    const livP = lot.total ? Math.round((lot.livres||0)/lot.total*100) : 0;
+    if(livP>=60&&av>=50) return {c:'#10b981',l:'Vert',bg:'var(--t5bg)'};
+    if(livP>=30||av>=30) return {c:'#f59e0b',l:'Orange',bg:'var(--t3bg)'};
+    return {c:'#ef4444',l:'Rouge',bg:'var(--rougeL, rgba(239,68,68,.08))'};
+  }
+
+  // Funnel d'avancement (pipeline)
+  const pipeline = [
+    {label:'Non démarré',count:byS[0]||0,col:'#94a3b8',etat:0},
+    {label:'Design',     count:byS[1]||0,col:'#3b82f6',etat:1},
+    {label:'Delivery',   count:byS[2]||0,col:'#8b5cf6',etat:2},
+    {label:'Éd. Plans',  count:byS[3]||0,col:'#f59e0b',etat:3},
+    {label:'Travaux',    count:byS[4]||0,col:'#f97316',etat:4},
+    {label:'Livré',      count:byS[5]||0,col:'#10b981',etat:5},
+    {label:'MES',        count:byS[6]||0,col:'#06b6d4',etat:6},
+  ];
+  const maxPipe = Math.max(...pipeline.map(p=>p.count),1);
+
+  // Top blockers
+  const blockers = [
+    {icon:'🔴',label:'BUS à risque élevé',     val:riskHigh||0,   seuil:0,  col:'#ef4444'},
+    {icon:'📐',label:'Tronçons NOK en mesure', val:nokCount||0,   seuil:0,  col:'#f59e0b'},
+    {icon:'🔄',label:'Sites SIN3 non mis à jour',val:sin3Nok||0,  seuil:0,  col:'#f97316'},
+    {icon:'⏳',label:'BUS travaux stagnants (<20%)', val:S.bus.filter(b=>b.etat===4&&b.av<20).length, seuil:0, col:'#f59e0b'},
+    {icon:'📦',label:'Commandes fermes en attente', val:(S.delivery.length-cfCount), seuil:0, col:'#6b7280'},
+  ];
+
+  // Prévisions livraisons (semaines à venir)
+  const withLiv = S.bus.filter(b=>b.liv&&b.etat<5);
+  const bySem = {};
+  withLiv.forEach(b=>{ const k=(b.liv||'').slice(0,9).trim(); if(k) bySem[k]=(bySem[k]||0)+1; });
+  const forecastSems = Object.entries(bySem).sort(([a],[b])=>a.localeCompare(b)).slice(0,8);
+  const forecastMax  = Math.max(...forecastSems.map(([,v])=>v),1);
+
+  // Score par lot pour le podium
+  const lotScores = lots.map(l=>{
+    const pLiv = l.total ? Math.round((l.livres||0)/l.total*100) : 0;
+    const rag   = lotRAG(l);
+    return {...l, pLiv, rag};
+  }).sort((a,b)=>b.pLiv-a.pLiv);
+
+  return [
+    '<div class="page" style="max-width:1300px">',
+
+    // ── En-tête avec score de santé ──
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">',
+    '<div>',
+    '<div class="page-title">Dashboard Direction</div>',
+    '<div class="page-sub">Vue exécutive · '+total+' BUS · '+new Date().toLocaleDateString('fr-FR')+'</div>',
+    '</div>',
+    '<div style="display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--card);border:2px solid '+healthColor(healthScore)+';border-radius:14px;box-shadow:var(--sh)">',
+    '<div style="font-size:28px">'+healthIcon(healthScore)+'</div>',
+    '<div>',
+    '<div style="font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Santé projet</div>',
+    '<div style="font-size:22px;font-weight:800;color:'+healthColor(healthScore)+'">'+healthScore+'/100</div>',
+    '<div style="font-size:12px;color:'+healthColor(healthScore)+';font-weight:600">'+healthLabel(healthScore)+'</div>',
+    '</div>',
+    '</div>',
+    '</div>',
+
+    // ── KPIs headline ──
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">',
+    ...[
+      ['Taux de livraison', txLiv+'%', livres+' BUS livrés ou MES sur '+total, '#10b981', txLiv>=50?'↑ En bonne voie':'↓ À accélérer'],
+      ['BUS en chantier',   txTrx+'%', travaux+' BUS en travaux actifs',        '#f97316', travaux>0?'Chantiers ouverts':'Aucun chantier actif'],
+      ['Commandes fermes',  txCF+'%',  cfCount+' sur '+S.delivery.length+' BUS', '#7c3aed', txCF>=70?'Bonne couverture':'Commandes à finaliser'],
+      ['Mise en service',   mes_+' BUS', Math.round(mes_/total*100)+'% du parc actif', '#06b6d4', mes_>0?'En exploitation':'En attente'],
+    ].map(function(x){ return '<div class="card" style="border-left:4px solid '+x[3]+'">'
+      +'<div style="font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">'+x[0]+'</div>'
+      +'<div style="font-size:30px;font-weight:800;color:'+x[3]+';line-height:1;margin-bottom:4px">'+x[1]+'</div>'
+      +'<div style="font-size:12px;color:var(--mut);margin-bottom:6px">'+x[2]+'</div>'
+      +'<div style="font-size:11px;font-weight:600;color:'+x[3]+'">'+x[4]+'</div>'
+      +'</div>';
+    }),
+    '</div>',
+
+    // ── Ligne 2 : Statut lots | Funnel ──
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">',
+
+    // Statut par lot (RAG)
+    '<div class="card">',
+    '<div class="section-title">Statut par lot</div>',
+    ...lotScores.map(function(l){
+      const rag = l.rag;
+      return '<div style="padding:14px;background:var(--th);border-radius:10px;border-left:4px solid '+rag.c+';margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+        +'<div style="display:flex;align-items:center;gap:10px">'
+        +'<div style="width:10px;height:10px;border-radius:50%;background:'+rag.c+'"></div>'
+        +'<span style="font-size:15px;font-weight:700;color:var(--text)">'+l.lot+'</span>'
+        +'<span class="badge" style="background:'+rag.bg+';color:'+rag.c+'">'+rag.l+'</span>'
+        +'</div>'
+        +'<div style="text-align:right">'
+        +'<div style="font-size:18px;font-weight:700;color:'+rag.c+'">'+l.pLiv+'%</div>'
+        +'<div style="font-size:11px;color:var(--mut)">livrés/MES</div>'
+        +'</div></div>'
+        +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">'
+        +[['Total',l.total,'var(--text)'],['Travaux',l.trx,'#f97316'],['Livrés',l.livres,'#10b981'],['Av. moy.',l.avMoy+'%','var(--acc)']].map(function(m){
+          return '<div style="text-align:center;padding:6px;background:var(--card);border-radius:7px">'
+            +'<div style="font-size:15px;font-weight:700;color:'+m[2]+'">'+m[1]+'</div>'
+            +'<div style="font-size:10px;color:var(--mut)">'+m[0]+'</div></div>';
+        }).join('')
+        +'</div>'
+        +'<div style="height:6px;background:var(--brd);border-radius:99px;overflow:hidden;display:flex">'
+        +'<div style="width:'+l.pLiv+'%;background:#10b981"></div>'
+        +'<div style="width:'+(l.total?Math.round(l.trx/l.total*100):0)+'%;background:#f97316"></div>'
+        +'</div></div>';
+    }),
+    '</div>',
+
+    // Pipeline funnel
+    '<div class="card">',
+    '<div class="section-title">Pipeline de production</div>',
+    '<div style="font-size:12px;color:var(--sub);margin-bottom:14px">Flux des BUS à travers les phases du projet</div>',
+    ...pipeline.filter(function(p){return p.count>0;}).map(function(p,i,arr){
+      const pct = Math.round(p.count/total*100);
+      const w   = Math.max(12, Math.round(p.count/maxPipe*100));
+      return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'
+        +'<div style="width:90px;font-size:12px;color:var(--sub);text-align:right;flex-shrink:0">'+p.label+'</div>'
+        +'<div style="flex:1;height:24px;background:var(--brd);border-radius:6px;overflow:hidden;position:relative">'
+        +'<div style="width:'+w+'%;height:100%;background:'+p.col+';border-radius:6px;opacity:.85;transition:width .4s"></div>'
+        +'</div>'
+        +'<div style="width:48px;text-align:right;font-size:14px;font-weight:700;color:'+p.col+'">'+p.count+'</div>'
+        +'<div style="width:36px;text-align:right;font-size:11px;color:var(--mut)">'+pct+'%</div>'
+        +'</div>';
+    }),
+    '</div>',
+    '</div>',
+
+    // ── Ligne 3 : Alertes exécutives | Prévisions ──
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">',
+
+    // Alertes
+    '<div class="card">',
+    '<div class="section-title">Points d\'attention direction</div>',
+    ...blockers.map(function(b){
+      const ok = b.val === 0;
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;margin-bottom:8px;background:var(--th);border-radius:9px;border-left:3px solid '+(ok?'#10b981':b.col)+'">'
+        +'<div style="font-size:18px">'+b.icon+'</div>'
+        +'<div style="flex:1;font-size:13px;color:var(--sub)">'+b.label+'</div>'
+        +'<div style="font-size:20px;font-weight:800;color:'+(ok?'#10b981':b.col)+'">'+b.val+'</div>'
+        +'<div style="font-size:11px;padding:2px 8px;border-radius:20px;background:'+(ok?'var(--t5bg)':'var(--t3bg)')+';color:'+(ok?'var(--t5c)':'var(--t3c)')+'">'+( ok?'OK':'Action')+'</div>'
+        +'</div>';
+    }),
+    '</div>',
+
+    // Prévisions de livraison
+    '<div class="card">',
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">',
+    '<div class="section-title" style="margin:0">Prévisions de livraison</div>',
+    '<div style="font-size:12px;color:var(--mut)">'+withLiv.length+' BUS planifiés</div>',
+    '</div>',
+    forecastSems.length ? (
+      '<div style="display:flex;align-items:flex-end;gap:8px;height:130px;padding:0 4px">'
+      + forecastSems.map(function(entry){
+        const s=entry[0], n=entry[1];
+        const h = Math.round(n/forecastMax*100)+8;
+        const isNext = forecastSems.indexOf(entry) === 0;
+        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end">'
+          +'<div style="font-size:12px;font-weight:700;color:'+(isNext?'#f97316':'var(--acc)')+'">'+n+'</div>'
+          +'<div style="width:100%;background:'+(isNext?'#f97316':'var(--acc)')+';border-radius:5px 5px 0 0;height:'+h+'px;opacity:'+(isNext?'1':'.7')+'"></div>'
+          +'<div style="font-size:9px;color:var(--mut);white-space:nowrap;text-align:center">'+esc(s)+'</div>'
+          +'</div>';
+      }).join('')
+      +'</div>'
+    ) : '<div style="text-align:center;padding:32px;color:var(--mut)">Aucune date prévisionnelle</div>',
+    '<div style="margin-top:12px;padding:10px 12px;background:var(--al);border-radius:8px;border:1px solid var(--brd)">'
+    +'<div style="font-size:12px;font-weight:600;color:var(--acc);margin-bottom:4px">Synthèse prévisionnelle</div>'
+    +'<div style="font-size:12px;color:var(--sub)">'+(forecastSems.length>0?'Prochaine échéance : <strong>'+esc(forecastSems[0][0])+'</strong> ('+forecastSems[0][1]+' BUS)':'Aucune échéance planifiée')+'</div>'
+    +'<div style="font-size:12px;color:var(--sub);margin-top:2px">BUS sans date prévisionnelle : <strong>'+(total-withLiv.length)+'</strong></div>'
+    +'</div>',
+    '</div>',
+    '</div>',
+
+    // ── Ligne 4 : Message de synthèse IA ──
+    '<div class="card" style="border:1px solid var(--acc);background:var(--al)">',
+    '<div style="display:flex;gap:14px;align-items:flex-start">',
+    '<div style="font-size:28px;flex-shrink:0">🎯</div>',
+    '<div>',
+    '<div style="font-size:14px;font-weight:700;color:var(--acc);margin-bottom:8px">Synthèse exécutive</div>',
+    '<div style="font-size:13px;color:var(--text);line-height:1.7">',
+    (function(){
+      const msgs = [];
+      if(txLiv>=50) msgs.push('Le projet avance conformément aux objectifs avec <strong>'+livres+' BUS livrés ou en MES</strong> ('+txLiv+'% du parc).');
+      else msgs.push('Le taux de livraison de <strong>'+txLiv+'%</strong> ('+livres+' BUS) nécessite une attention particulière pour tenir les objectifs.');
+      if(travaux>0) msgs.push('<strong>'+travaux+' BUS sont actuellement en phase travaux</strong>, représentant le principal flux de production.');
+      if(riskHigh>0) msgs.push('<span style="color:#ef4444;font-weight:600">'+riskHigh+' BUS présentent un risque élevé</span> — arbitrage direction recommandé.');
+      else msgs.push('Aucun BUS à risque élevé identifié à ce jour.');
+      if(txCF<50) msgs.push('Le taux de commandes fermes ('+txCF+'%) est insuffisant — relance commerciale conseillée.');
+      const bestLot = lotScores[0];
+      if(bestLot) msgs.push('Le lot le plus avancé est <strong>'+bestLot.lot+'</strong> avec '+bestLot.pLiv+'% de BUS livrés.');
+      return msgs.join(' ');
+    })(),
+    '</div>',
+    '</div>',
+    '</div>',
+    '</div>',
+
+    '</div>',
+  ].join('');
 }
 
 function renderSidebar(){
@@ -2257,7 +2494,7 @@ function initCharts(){
   }}
 
 // ── RENDER ────────────────────────────────────────
-const PAGES={prod:pageProd,kpi:pageKPI,bus:pageBUS,delivery:pageDelivery,travaux:pageTravaux,mesures:pageMesures,cdd:pageCDD,empl:pageEmpl,cpm:pageCPM,users:pageUsers,import:pageImport,settings:pageSettings};
+const PAGES={prod:pageProd,kpi:pageKPI,ia:pageIA,bus:pageBUS,delivery:pageDelivery,travaux:pageTravaux,mesures:pageMesures,cdd:pageCDD,empl:pageEmpl,cpm:pageCPM,users:pageUsers,import:pageImport,settings:pageSettings};
 
 function renderMain(){
   document.getElementById('main').innerHTML=(PAGES[S.page]||pageProd)();
