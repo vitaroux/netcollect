@@ -2183,7 +2183,7 @@ const Chat = {
     document.getElementById('chatSend').addEventListener('click', ()=>Chat.send());
     document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); Chat.send(); } });
     // Message de bienvenue
-    Chat.addMsg('bot', "Bonjour\xa0! Je suis l'assistant TransProd.\n\nJe peux r\xc3\xa9pondre \xc3\xa0 vos questions sur les BUS, les statuts, les modules de l'application ou les processus Orange.\n\nComment puis-je vous aider ?");
+    Chat.addMsg('bot', "Bonjour\xa0! Je suis l'assistant Vi. J'suis en mode BETA donc je peux faire des erreurs 😊. Merci de me solliciter si c'est vraiment nécessaire car les tokens c'est pas gratos.\n\nComment puis-je vous aider ?");
   },
 
   toggle(){ Chat.open ? Chat.close() : Chat.openPanel(); },
