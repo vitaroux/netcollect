@@ -92,12 +92,12 @@ select option{background:var(--card)}
 const SC={0:{s:'Non démarré',v:'t0'},1:{s:'Design',v:'t1'},2:{s:'Delivery',v:'t2'},3:{s:'Éd. Plans',v:'t3'},4:{s:'Travaux',v:'t4'},5:{s:'Livré',v:'t5'},6:{s:'MES',v:'t6'}};
 const RC={Faible:{bg:'var(--t5bg)',c:'var(--t5c)'},Moyen:{bg:'var(--t3bg)',c:'var(--t3c)'},Élevé:{bg:'rgba(239,68,68,.1)',c:'#ef4444'}};
 const CC=['#7c3aed','#3b82f6','#06b6d4','#10b981','#f59e0b','#f97316','#ef4444'];
-const NAV=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Dashboard KPI',g:'Dashboards',i:'📊'},{id:'bus',l:'BUS / Topologies',g:'Modules',i:'🔌'},{id:'delivery',l:'Delivery',g:'Modules',i:'📦'},{id:'travaux',l:'Travaux',g:'Modules',i:'🏗'},{id:'mesures',l:'Mesures',g:'Modules',i:'📐'},{id:'cdd',l:'CDD',g:'Modules',i:'📋'},{id:'empl',l:'Emplacements',g:'Modules',i:'📍'},{id:'import',l:'Import Excel',g:'Config',i:'📥'},{id:'settings',l:'Paramétrage',g:'Config',i:'⚙'}];
+const NAV=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Dashboard KPI',g:'Dashboards',i:'📊'},{id:'bus',l:'BUS / Topologies',g:'Modules',i:'🔌'},{id:'delivery',l:'Delivery',g:'Modules',i:'📦'},{id:'travaux',l:'Travaux',g:'Modules',i:'🏗'},{id:'mesures',l:'Mesures',g:'Modules',i:'📐'},{id:'cdd',l:'CDD',g:'Modules',i:'📋'},{id:'empl',l:'Emplacements',g:'Modules',i:'📍'},{id:'cpm',l:'CPM / CRMAD',g:'Modules',i:'📡'},{id:'import',l:'Import Excel',g:'Config',i:'📥'},{id:'settings',l:'Paramétrage',g:'Config',i:'⚙'}];
 
 // ── STATE ────────────────────────────────────────
 const S={
   page:'prod', dark:false,
-  bus:[], delivery:[], mesures:[], cdd:[], emplacements:[],
+  bus:[], delivery:[], mesures:[], cdd:[], emplacements:[], cpm:[],
   stats:{byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0},
   fq:'',fl:'',fe:'',fr:'',fk:'',sk:'id',sd:1,pg:0,
   modal:null, modalTab:'synthese', view:'table',
@@ -114,11 +114,11 @@ const api = {
 
 async function loadAll(){
   try {
-    const [bus,delivery,mesures,cdd,emplacements,stats] = await Promise.all([
+    const [bus,delivery,mesures,cdd,emplacements,cpm,stats] = await Promise.all([
       api.get('/api/bus'), api.get('/api/delivery'), api.get('/api/mesures'),
-      api.get('/api/cdd'), api.get('/api/emplacements'), api.get('/api/stats'),
+      api.get('/api/cdd'), api.get('/api/emplacements'), api.get('/api/cpm'), api.get('/api/stats'),
     ]);
-    Object.assign(S, {bus,delivery,mesures,cdd,emplacements,stats});
+    Object.assign(S, {bus,delivery,mesures,cdd,emplacements,cpm,stats});
   } catch(e){ notify('Erreur connexion serveur: '+e.message,'error'); }
 }
 
@@ -412,6 +412,163 @@ function pageEmpl(){
   </div>`;
 }
 
+
+// ── PAGE CPM / CRMAD ─────────────────────────────
+function pageCPM(){
+  // Fusion bus + cpm : un CPM peut exister ou non pour chaque BUS
+  const allTopos = [...new Set([...S.bus.map(b=>b.id), ...S.cpm.map(c=>c.topo)])].sort();
+  const rows = allTopos.map(id => {
+    const b = S.bus.find(x=>x.id===id) || {};
+    const c = S.cpm.find(x=>x.topo===id) || null;
+    return {id, lot:b.lot||'', rr:b.rr||'', etat:b.etat??0, cpm:c};
+  });
+  const statuts = ['Non reçu','CRMAD reçu','En vérification','Validé','Bloqué'];
+  const sc={
+    'Non reçu':'rgba(100,116,139,.15):#94a3b8',
+    'CRMAD reçu':'rgba(59,130,246,.12):#93c5fd',
+    'En vérification':'rgba(234,179,8,.1):#fde68a',
+    'Validé':'rgba(34,197,94,.1):#86efac',
+    'Bloqué':'rgba(239,68,68,.1):#ef4444',
+  };
+  function sbg(s){const p=(sc[s]||'rgba(100,116,139,.15):#94a3b8').split(':');return `background:${p[0]};color:${p[1]}`;}
+  const recu=rows.filter(r=>r.cpm).length;
+  const valide=rows.filter(r=>r.cpm&&r.cpm.statut==='Validé').length;
+  const bloque=rows.filter(r=>r.cpm&&r.cpm.statut==='Bloqué').length;
+  return `<div class="page">
+    <div class="page-hdr">
+      <div><div class="page-title">CPM / CRMAD</div><div class="page-sub">Suivi des Comptes-Rendus de Mise à Disposition · ${rows.length} BUS · ${recu} CRMAD reçus</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="font-size:11px;color:var(--sub)">Uploader un nouveau fichier CRMAD :</div>
+        <label style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--acc);background:var(--al);color:var(--acc);font-size:12px;font-weight:500;cursor:pointer">
+          📡 Importer CRMAD <input type="file" id="cpmFileInput" accept=".xlsx" style="display:none">
+        </label>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+      ${krow('Total BUS',rows.length,'#6b7280','🔌','')}
+      ${krow('CRMAD reçus',recu,'#3b82f6','📡',rows.length?Math.round(recu/rows.length*100)+'%':'')}
+      ${krow('Validés',valide,'#10b981','✓','')}
+      ${krow('Bloqués',bloque,'#ef4444','⚠','')}
+    </div>
+    <div class="tbl-wrap"><div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>Topologie</th><th>Lot</th><th>RR</th><th>État BUS</th>
+        <th>Statut CPM</th><th>Réf. commande</th><th>Date CRMAD</th>
+        <th>Segments</th><th>Sites</th><th>FO total</th><th>Long. totale</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr class="${i%2?'odd':'even'}">
+        <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(r.id)}</span></td>
+        <td><span class="lot-badge">${r.lot||'–'}</span></td>
+        <td style="color:var(--sub);font-size:11px">${esc(r.rr)||'–'}</td>
+        <td>${sbadge(r.etat)}</td>
+        <td>${r.cpm?`<span class="badge" style="${sbg(r.cpm.statut)}">${r.cpm.statut}</span>`:`<span class="badge" style="${sbg('Non reçu')}">Non reçu</span>`}</td>
+        <td style="font-size:11px;color:var(--sub);font-family:monospace">${r.cpm?esc(r.cpm.ref_commande).slice(0,30):'–'}</td>
+        <td style="font-size:11px;color:var(--sub)">${r.cpm?r.cpm.date_crmad:'–'}</td>
+        <td style="text-align:center;font-weight:600;color:var(--text)">${r.cpm?r.cpm.nb_segments:'–'}</td>
+        <td style="text-align:center;font-weight:600;color:var(--text)">${r.cpm?r.cpm.nb_sites:'–'}</td>
+        <td style="text-align:center;color:#3b82f6;font-weight:600">${r.cpm?r.cpm.nb_fo_total:'–'}</td>
+        <td style="text-align:center;color:var(--sub);font-size:11px">${r.cpm?Math.round(r.cpm.longueur_totale/1000)+'km':'–'}</td>
+        <td>${r.cpm?`<button class="btn sm" data-cpmtopo="${esc(r.id)}" style="color:var(--acc);border-color:var(--acc)">Détail</button>`:`<label style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:7px;border:1px solid var(--brd);color:var(--sub);font-size:11px;cursor:pointer">📡 Import<input type="file" accept=".xlsx" data-bustopo="${esc(r.id)}" class="cpmRowInput" style="display:none"></label>`}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>
+    <div id="cpmDetail"></div>
+  </div>`;
+}
+
+function renderCPMDetail(topo){
+  const c=S.cpm.find(x=>x.topo===topo); if(!c) return;
+  const statuts=['Non reçu','CRMAD reçu','En vérification','Validé','Bloqué'];
+  const typeColors={'CPM_NRO_CO':'#3b82f6','CPM_NRO_NRO':'#7c3aed','CPM_CO_CO':'#10b981','CPM_CO_NRABTS':'#f59e0b'};
+  const el=document.getElementById('cpmDetail'); if(!el) return;
+  el.innerHTML=`<div class="card" style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text)">${esc(topo)}</div>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px">Réf. commande : <span style="font-family:monospace">${esc(c.ref_commande)}</span></div>
+        <div style="font-size:11px;color:var(--sub)">Date CRMAD : <strong>${c.date_crmad}</strong> · Date réception : <strong>${c.date_reception||'–'}</strong></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <select id="cpmStatut" style="padding:6px 10px;font-size:12px">
+          ${statuts.map(s=>`<option${c.statut===s?' selected':''}>${s}</option>`).join('')}
+        </select>
+        <button class="btn primary" id="saveCPM" data-topo="${esc(topo)}">✓ Enregistrer</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px">
+      ${[['Segments CPM',c.nb_segments,'#7c3aed'],['Sites',c.nb_sites,'#3b82f6'],['FO total',c.nb_fo_total,'#06b6d4'],['Long. totale',Math.round(c.longueur_totale/1000)+'km','#10b981'],['HEPOC sites',c.hepoc?c.hepoc.length:0,'#f59e0b']].map(([l,v,col])=>`<div style="background:var(--th);border-radius:8px;padding:10px;border:1px solid var(--brd);text-align:center"><div style="font-size:10px;color:var(--mut)">${l}</div><div style="font-size:18px;font-weight:700;color:${col}">${v}</div></div>`).join('')}
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:500">Commentaire</div>
+      <textarea id="cpmComment" rows="2" style="width:100%;resize:vertical;font-size:12px" placeholder="Commentaire sur ce CPM...">${esc(c.commentaire||'')}</textarea>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:500">Anomalies constatées</div>
+      <textarea id="cpmAnomalies" rows="2" style="width:100%;resize:vertical;font-size:12px" placeholder="Décrire les anomalies éventuelles...">${esc(c.anomalies||'')}</textarea>
+    </div>
+    ${c.hepoc&&c.hepoc.length?`<div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Sites HEPOC (${c.hepoc.length})</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Code site</th><th>Nom</th><th>CP</th><th>Type</th><th>Date MES</th><th>N° cmd FCI</th><th>GTI</th><th>Type accès</th><th>État baie</th></tr></thead>
+      <tbody>${c.hepoc.map((h,i)=>`<tr class="${i%2?'odd':'even'}">
+        <td><span class="mono" style="font-weight:600;color:var(--acc)">${esc(h.code_site)}</span></td>
+        <td style="font-weight:500">${esc(h.nom_site)}</td>
+        <td style="color:var(--sub)">${esc(h.cp)}</td>
+        <td><span class="badge" style="background:var(--al);color:var(--acc)">${esc(h.type_site)}</span></td>
+        <td style="color:var(--sub);font-size:11px">${esc(h.date_mes)}</td>
+        <td><span class="mono" style="font-size:10px">${esc(h.cmd)}</span></td>
+        <td style="font-size:11px;color:var(--sub)">${esc(h.gti)}</td>
+        <td style="font-size:11px;color:var(--sub)">${esc(h.type_acces)}</td>
+        <td>${esc(h.etat_baie1)==='EN_SERVICE'?'<span class="badge" style="background:var(--t5bg);color:var(--t5c)">EN SERVICE</span>':esc(h.etat_baie1)||'–'}</td>
+      </tr>`).join('')}</tbody></table></div>
+    </div>`:''}
+    <div>
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Segments CPM (${c.nb_segments} / ${c.segments?c.segments.length:0} au total)</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        ${Object.entries({'CPM_NRO_CO':'#3b82f6','CPM_NRO_NRO':'#7c3aed','CPM_CO_CO':'#10b981','CPM_CO_NRABTS':'#f59e0b'}).map(([t,c2])=>{
+          const n=(c.segments||[]).filter(s=>s.type===t).length;
+          return n?`<span class="badge" style="background:${c2}18;color:${c2}">${t} (${n})</span>`:'';
+        }).join('')}
+      </div>
+      <div class="tbl-wrap"><div style="overflow-x:auto;max-height:300px;overflow-y:auto"><table><thead><tr><th>Réf. segment</th><th>Sous-ref</th><th>Type</th><th>Date MESC</th><th>GTR</th><th>Long. (m)</th><th>Ext. A</th><th>Ext. B</th></tr></thead>
+      <tbody>${(c.segments||[]).filter(s=>s.type&&s.type.startsWith('CPM_')).map((seg,i)=>`<tr class="${i%2?'odd':'even'}">
+        <td><span class="mono" style="font-size:10px;color:var(--sub)">${esc(seg.ref_seg).slice(0,20)}…</span></td>
+        <td style="font-size:11px;color:var(--sub)">${esc(seg.sous_ref)}</td>
+        <td><span class="badge" style="background:${(typeColors[seg.type]||'#888')}18;color:${typeColors[seg.type]||'#888'};font-size:10px">${esc(seg.type)}</span></td>
+        <td style="font-size:11px;color:var(--sub)">${esc(seg.date_mesc)}</td>
+        <td style="font-size:11px;color:var(--sub)">${esc(seg.gtr)}</td>
+        <td style="font-weight:600;text-align:right">${seg.longueur.toLocaleString('fr-FR')}</td>
+        <td><span class="mono" style="font-weight:600;color:var(--acc)">${esc(seg.ext_a)}</span></td>
+        <td><span class="mono" style="font-weight:600;color:var(--acc)">${esc(seg.ext_b)}</span></td>
+      </tr>`).join('')}</tbody></table></div></div>
+    </div>
+  </div>`;
+  // Bind save button
+  document.getElementById('saveCPM')?.addEventListener('click', async()=>{
+    const statut=document.getElementById('cpmStatut')?.value;
+    const commentaire=document.getElementById('cpmComment')?.value||'';
+    const anomalies=document.getElementById('cpmAnomalies')?.value||'';
+    try{
+      await api.put('/api/cpm/'+encodeURIComponent(topo),{statut,commentaire,anomalies,user:S.userName});
+      const ci=S.cpm.findIndex(x=>x.topo===topo);
+      if(ci>=0)Object.assign(S.cpm[ci],{statut,commentaire,anomalies});
+      notify('CPM mis à jour');
+    }catch(e){notify('Erreur: '+e.message,'error');}
+  });
+}
+
+async function handleCPMImport(file, topo){
+  if(!file) return;
+  const topoName = topo || 'auto';
+  notify('Import CPM en cours...','warn');
+  try{
+    const fd=new FormData(); fd.append('file',file);
+    const result=await api.upload('/api/import/cpm',fd);
+    await loadAll();
+    notify(`CPM importé : ${result.topo} · ${result.nb_segments} segments · ${result.nb_sites} sites`);
+    S.page='cpm'; renderSidebar(); renderMain();
+    setTimeout(()=>renderCPMDetail(result.topo),50);
+  }catch(e){notify('Erreur import CPM: '+e.message,'error');}
+}
+
 function pageImport(){
   return `<div class="page">
     <div class="page-hdr"><div><div class="page-title">Import Excel</div><div class="page-sub">SUIVI_PROJET_Collecte.xlsx · Les commentaires saisis manuellement sont préservés</div></div></div>
@@ -587,7 +744,7 @@ function initCharts(){
 }
 
 // ── RENDER ────────────────────────────────────────
-const PAGES={prod:pageProd,kpi:pageKPI,bus:pageBUS,delivery:pageDelivery,travaux:pageTravaux,mesures:pageMesures,cdd:pageCDD,empl:pageEmpl,import:pageImport,settings:pageSettings};
+const PAGES={prod:pageProd,kpi:pageKPI,bus:pageBUS,delivery:pageDelivery,travaux:pageTravaux,mesures:pageMesures,cdd:pageCDD,empl:pageEmpl,cpm:pageCPM,import:pageImport,settings:pageSettings};
 
 function renderMain(){
   document.getElementById('main').innerHTML=(PAGES[S.page]||pageProd)();
@@ -631,6 +788,15 @@ function bindPageEvents(){
   const pn=document.getElementById('pgNext');if(pn)pn.addEventListener('click',()=>{const tp=Math.ceil(filterBus().length/12);S.pg=Math.min(tp-1,S.pg+1);renderMain();});
   document.querySelectorAll('[data-pg]').forEach(el=>el.addEventListener('click',()=>{S.pg=+el.dataset.pg;renderMain();}));
 
+  // CPM imports
+  const cpmGlobal=document.getElementById('cpmFileInput');
+  if(cpmGlobal) cpmGlobal.addEventListener('change',e=>handleCPMImport(e.target.files[0]));
+  document.querySelectorAll('.cpmRowInput').forEach(el=>el.addEventListener('change',e=>handleCPMImport(e.target.files[0],el.dataset.bustopo)));
+  document.querySelectorAll('[data-cpmtopo]').forEach(el=>el.addEventListener('click',()=>{
+    const t=el.dataset.cpmtopo;
+    renderCPMDetail(t);
+    document.getElementById('cpmDetail')?.scrollIntoView({behavior:'smooth'});
+  }));
   const vt=document.getElementById('vTable');if(vt)vt.addEventListener('click',()=>{S.view='table';renderMain();});
   const vk=document.getElementById('vKanban');if(vk)vk.addEventListener('click',()=>{S.view='kanban';renderMain();});
 
