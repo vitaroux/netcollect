@@ -793,11 +793,7 @@ app.get('/api/export', requireAuth, async (req,res) => {
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(trxRows),'Suivi TRAVAUX');
 
     // SUIVI DELIVERY
-    const dlvRows=delivery.map(d=>({'LOT':d.lot,'Projet':d.topo,'Etat':d.etat,'Transmis par Orange
-Date':d.hRcv,'Envoyé à Orange
-Date':d.hRnv,'Transmis par Orange
-Date_1':d.cRcv,'Envoyé à Orange
-Date_1':d.cRnv,'Commande ferme':d.cf}));
+    const dlvRows=delivery.map(d=>({'LOT':d.lot,'Projet':d.topo,'Etat':d.etat,'HEPOC Transmis Orange':d.hRcv,'HEPOC Envoye Orange':d.hRnv,'CPM Transmis Orange':d.cRcv,'CPM Envoye Orange':d.cRnv,'Commande ferme':d.cf}));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(dlvRows),'SUIVI DELIVERY');
 
     // Mesures
@@ -805,8 +801,7 @@ Date_1':d.cRnv,'Commande ferme':d.cf}));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mesRows),'Mesures');
 
     // CDD
-    const cddRows=cdd.map(c=>({'LOT':c.lot,'Référence topologie':c.topo,'Département':c.dept,'RR':c.rr,'Site
-Code 42C':c.sc,'Nom site':c.ns,'Date MAD Orange':c.mad,'Numèro Commande':c.cmd,'Projet PFTO lancé':c.pfto,'Info maj SIN3':c.sin3,'Commentaire Equipe PROJET':c.comment}));
+    const cddRows=cdd.map(c=>({'LOT':c.lot,'Reference topologie':c.topo,'Departement':c.dept,'RR':c.rr,'Site Code 42C':c.sc,'Nom site':c.ns,'Date MAD Orange':c.mad,'Numero Commande':c.cmd,'PFTO':c.pfto,'SIN3':c.sin3,'Commentaire':c.comment}));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cddRows),'CDD');
 
     // SUIVI EMPLACEMENT
