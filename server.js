@@ -65,7 +65,7 @@ async function logH(entity, eid, field, oldV, newV, user='système') {
   }
 }
 
-const PROFILES = ['Admin','CDP','CDR','BE','Projet'];
+const PROFILES = ['Admin','Pilote','CDP','CDR','BE'];
 
 // ── SESSION STORE ─────────────────────────────────
 let sessionStore;
