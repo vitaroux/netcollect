@@ -1426,13 +1426,13 @@ function pageEmpl(){
 // ═══════════════════════════════════════════════
 // PAGE UTILISATEURS
 // ═══════════════════════════════════════════════
-const PROFILES = ['Admin','CDP','CDR','BE','Projet'];
+const PROFILES = ['Admin','Pilote','CDP','CDR','BE'];
 const PROFILE_COLORS = {
   'Admin':  {bg:'rgba(239,68,68,.1)',   c:'#ef4444'},
   'CDP':    {bg:'rgba(124,58,237,.1)',  c:'#7c3aed'},
   'CDR':    {bg:'rgba(59,130,246,.1)',  c:'#3b82f6'},
   'BE':     {bg:'rgba(16,185,129,.1)', c:'#10b981'},
-  'Projet': {bg:'rgba(245,158,11,.1)', c:'#f59e0b'},
+  'Pilote': {bg:'rgba(245,158,11,.1)', c:'#f59e0b'},
 };
 function profBadge(p){const cfg=PROFILE_COLORS[p]||{bg:'var(--al)',c:'var(--acc)'};return `<span class="badge" style="background:${cfg.bg};color:${cfg.c}">${p}</span>`;}
 
