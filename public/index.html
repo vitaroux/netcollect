@@ -228,27 +228,180 @@ function pageProd(){
 }
 
 function pageKPI(){
-  const {byLot,avGlobal}=S.stats;
+  const {byLot,avGlobal,byEtat,cfCount,nokCount,sin3Nok,riskHigh}=S.stats;
+  const total=S.bus.length||1;
+  const livres=S.bus.filter(b=>b.etat>=5).length;
+  const mes_=S.bus.filter(b=>b.etat===6).length;
+  const trx=S.bus.filter(b=>b.etat===4).length;
   const okT=S.mesures.reduce((a,m)=>a+m.ok,0);
   const nokT=S.mesures.reduce((a,m)=>a+m.nok,0);
-  return `<div class="page">
-    <div class="page-hdr"><div><div class="page-title">Dashboard KPI</div><div class="page-sub">Vue management · Indicateurs de performance</div></div></div>
-    <div class="kpi4">
-      ${krow('Taux livraison',S.bus.length?Math.round(S.bus.filter(b=>b.etat>=5).length/S.bus.length*100)+'%':0,'#10b981','✓',S.bus.filter(b=>b.etat>=5).length+'/'+S.bus.length)}
-      ${krow('Taux MES',S.bus.length?Math.round(S.bus.filter(b=>b.etat===6).length/S.bus.length*100)+'%':0,'#06b6d4','⚡','')}
-      ${krow('Mesures OK',(okT+nokT>0?Math.round(okT/(okT+nokT)*100):0)+'%','#3b82f6','📐','')}
-      ${krow('Avancement moy.',(avGlobal||0)+'%','#7c3aed','📈','')}
+  const tauxLiv=Math.round(livres/total*100);
+  const tauxMES=Math.round(mes_/total*100);
+  const tauxMes=okT+nokT>0?Math.round(okT/(okT+nokT)*100):0;
+  const tauxCF=S.delivery.length>0?Math.round(S.delivery.filter(d=>d.cf==='OUI').length/S.delivery.length*100):0;
+  const byS=Object.fromEntries((byEtat||[]).map(r=>[r.etat,r.count]));
+
+  // Gauge SVG helper
+  function gauge(pct,col,size=64){
+    const r=26,c=size/2,circ=2*Math.PI*r,dash=circ*pct/100,gap=circ-dash;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--brd)" stroke-width="5"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${col}" stroke-width="5"
+        stroke-dasharray="${dash} ${gap}" stroke-linecap="round"
+        transform="rotate(-90 ${c} ${c})"/>
+      <text x="${c}" y="${c}" text-anchor="middle" dominant-baseline="central"
+        font-size="12" font-weight="700" fill="${col}">${pct}%</text>
+    </svg>`;
+  }
+
+  // Mini spark bar
+  function minibar(data,col){
+    const max=Math.max(...data,1);
+    return `<div style="display:flex;align-items:flex-end;gap:2px;height:28px">${data.map(v=>`<div style="flex:1;background:${col};border-radius:2px 2px 0 0;height:${Math.round(v/max*28)}px;opacity:.85"></div>`).join('')}</div>`;
+  }
+
+  const lots=byLot||[];
+  return `<div class="page" style="max-width:1200px">
+    <div class="page-hdr">
+      <div><div class="page-title">Dashboard KPI</div>
+      <div class="page-sub">${total} BUS · mis à jour ${new Date().toLocaleDateString('fr-FR')}</div></div>
     </div>
-    <div class="grid2" style="margin-bottom:14px">
-      <div class="card"><div class="section-title">États BUS</div><canvas id="pieChart" height="220"></canvas></div>
-      <div class="card"><div class="section-title">Par Lot</div><canvas id="barChart" height="220"></canvas></div>
+
+    <!-- Ligne 1 : 4 métriques circulaires principales -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      ${[
+        ['Taux livraison','Livrés + MES',tauxLiv,'#10b981',livres+'/'+total],
+        ['Taux MES','Mise en service',tauxMES,'#06b6d4',mes_+' BUS'],
+        ['Mesures OK','Tronçons conformes',tauxMes,'#3b82f6',okT+'/'+(okT+nokT||1)],
+        ['Cmd fermes','Sur total delivery',tauxCF,'#7c3aed',S.delivery.filter(d=>d.cf==='OUI').length+'/'+S.delivery.length],
+      ].map(([t,sub,pct,col,det])=>`
+        <div class="card" style="display:flex;align-items:center;gap:14px">
+          ${gauge(pct,col)}
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:1px">${t}</div>
+            <div style="font-size:10px;color:var(--mut)">${sub}</div>
+            <div style="font-size:11px;color:${col};font-weight:600;margin-top:4px">${det}</div>
+          </div>
+        </div>`).join('')}
     </div>
-    <div class="grid2">
-      <div class="card"><div class="section-title">Avancement / RR</div><canvas id="rrChart" height="190"></canvas></div>
-      <div class="card"><div class="section-title">Distribution états</div><canvas id="lotLineChart" height="190"></canvas></div>
+
+    <!-- Ligne 2 : états BUS détail + avancement par lot -->
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;margin-bottom:12px">
+
+      <!-- États BUS : liste avec barres -->
+      <div class="card">
+        <div class="section-title">Répartition des états</div>
+        <div style="position:relative;margin:4px 0 12px">
+          <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;gap:1px">
+            ${Object.entries(SC).map(([k,v])=>{
+              const n=byS[k]||0; if(!n)return'';
+              const c=CC[+k%CC.length];
+              return `<div style="flex:${n};background:${c}" title="${v.s}: ${n}"></div>`;
+            }).join('')}
+          </div>
+        </div>
+        ${Object.entries(SC).map(([k,v])=>{
+          const n=byS[k]||0; if(!n) return '';
+          const c=CC[+k%CC.length];
+          const pct=Math.round(n/total*100);
+          return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--brd)">
+            <div style="width:8px;height:8px;border-radius:2px;background:${c};flex-shrink:0"></div>
+            <div style="flex:1;font-size:11px;color:var(--sub)">${v.s}</div>
+            <div style="font-size:11px;font-weight:600;color:var(--text);min-width:20px;text-align:right">${n}</div>
+            <div style="width:48px;height:3px;background:var(--brd);border-radius:99px;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:${c}"></div>
+            </div>
+            <div style="font-size:10px;color:var(--mut);min-width:26px;text-align:right">${pct}%</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Avancement par lot : barres horizontales -->
+      <div class="card">
+        <div class="section-title">Avancement & progression par lot</div>
+        ${lots.length===0?'<div style="color:var(--mut);font-size:12px">Aucun lot</div>':
+          lots.map(l=>{
+            const pLiv=l.total>0?Math.round((l.livres||0)/l.total*100):0;
+            const pTrx=l.total>0?Math.round((l.trx||0)/l.total*100):0;
+            return `<div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+                <div style="font-size:12px;font-weight:600;color:var(--text)">${l.lot}</div>
+                <div style="font-size:11px;color:var(--mut)">${l.total} BUS · avancement moy. <strong style="color:var(--acc)">${l.avMoy||0}%</strong></div>
+              </div>
+              <div style="display:flex;height:10px;background:var(--brd);border-radius:99px;overflow:hidden;margin-bottom:5px">
+                <div style="width:${pLiv}%;background:#10b981;border-radius:99px 0 0 99px" title="Livrés: ${l.livres||0}"></div>
+                <div style="width:${pTrx}%;background:#f97316" title="Travaux: ${l.trx||0}"></div>
+                <div style="flex:1;background:var(--al)"></div>
+              </div>
+              <div style="display:flex;gap:12px">
+                <span style="font-size:10px;color:#10b981">■ Livrés/MES ${l.livres||0} (${pLiv}%)</span>
+                <span style="font-size:10px;color:#f97316">■ Travaux ${l.trx||0} (${pTrx}%)</span>
+                <span style="font-size:10px;color:var(--mut)">■ Autres ${l.total-(l.livres||0)-(l.trx||0)}</span>
+              </div>
+            </div>`;
+          }).join('')}
+      </div>
+    </div>
+
+    <!-- Ligne 3 : alertes + graphiques -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+
+      <!-- Points d'attention -->
+      <div class="card">
+        <div class="section-title">Points d'attention</div>
+        ${[
+          [riskHigh||0,'#ef4444','BUS à risque élevé','⚠'],
+          [nokCount||0,'#f59e0b','Mesures NOK','📐'],
+          [sin3Nok||0,'#f97316','Sites SIN3 non MAJ','🔄'],
+          [S.bus.filter(b=>b.etat===4&&b.av<20).length,'#f87171','BUS travaux <20%','🐢'],
+          [S.bus.filter(b=>!b.rr||b.rr==='').length,'#94a3b8','BUS sans RR affecté','👤'],
+        ].map(([n,c,l,ic])=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--brd)">
+            <div style="width:28px;height:28px;border-radius:7px;background:${c}15;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${ic}</div>
+            <div style="flex:1;font-size:11px;color:var(--sub)">${l}</div>
+            <div style="font-size:16px;font-weight:700;color:${n>0?c:'var(--mut)'}">${n}</div>
+          </div>`).join('')}
+      </div>
+
+      <!-- Avancement / RR -->
+      <div class="card">
+        <div class="section-title">Avancement moyen par RR</div>
+        <canvas id="rrChart" height="210"></canvas>
+      </div>
+
+      <!-- États donut -->
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="section-title">Distribution états</div>
+        <canvas id="pieChart" style="flex:1;max-height:210px"></canvas>
+      </div>
+    </div>
+
+    <!-- Ligne 4 : livraisons prévisionnelles par semaine -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-title" style="margin:0">Livraisons prévisionnelles</div>
+        <div style="font-size:11px;color:var(--mut)">${S.bus.filter(b=>b.liv&&b.liv!=='').length} BUS avec date prévisionnelle</div>
+      </div>
+      ${(()=>{
+        const withLiv=S.bus.filter(b=>b.liv&&b.etat<5);
+        if(!withLiv.length) return '<div style="color:var(--mut);font-size:12px;text-align:center;padding:20px">Aucune date prévisionnelle renseignée</div>';
+        const bySem={};
+        withLiv.forEach(b=>{const k=b.liv.slice(0,9);bySem[k]=(bySem[k]||0)+1;});
+        const sems=Object.entries(bySem).sort(([a],[b])=>a.localeCompare(b)).slice(0,10);
+        const max=Math.max(...sems.map(([,v])=>v),1);
+        return `<div style="display:flex;align-items:flex-end;gap:6px;height:60px;padding:0 4px">
+          ${sems.map(([s,n])=>`
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <div style="font-size:9px;color:var(--acc);font-weight:600">${n}</div>
+              <div style="width:100%;background:var(--acc);border-radius:3px 3px 0 0;height:${Math.round(n/max*40)+8}px;opacity:.8"></div>
+              <div style="font-size:8px;color:var(--mut);white-space:nowrap">${s}</div>
+            </div>`).join('')}
+        </div>`;
+      })()}
     </div>
   </div>`;
 }
+
 
 function pageBUS(){
   let rows=filterBus();
@@ -720,6 +873,14 @@ function initCharts(){
   destroyCharts();
   const dk=S.dark;
   const tc={color:dk?'#94a3b8':'#6b7280'};
+  const TTC={callbacks:{}};  // tooltip config base
+  TTC.backgroundColor=dk?'#1e293b':'#ffffff';
+  TTC.titleColor=dk?'#f1f5f9':'#1e1b4b';
+  TTC.bodyColor=dk?'#94a3b8':'#6b7280';
+  TTC.borderColor=dk?'#334155':'#e5e7eb';
+  TTC.borderWidth=1;
+  TTC.padding=8;
+  TTC.cornerRadius=8;
   const gb={grid:{color:dk?'#1e293b':'#f0f2f7'},ticks:tc};
   const no={display:false};
 
@@ -733,28 +894,42 @@ function initCharts(){
 
   if(S.page==='kpi'){
     const byS=Object.fromEntries((S.stats.byEtat||[]).map(r=>[r.etat,r.count]));
-    const pie=document.getElementById('pieChart');
-    if(pie) S.charts.pie=new Chart(pie,{type:'doughnut',data:{labels:Object.values(SC).map(v=>v.s),datasets:[{data:Object.keys(SC).map(k=>byS[k]||0),backgroundColor:CC,borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10},color:tc.color}}},cutout:'55%'}});
 
-    const bar=document.getElementById('barChart');
-    if(bar){
-      const bl=S.stats.byLot||[];
-      S.charts.bar=new Chart(bar,{type:'bar',data:{labels:bl.map(b=>b.lot),datasets:[{label:'Total',data:bl.map(b=>b.total),backgroundColor:dk?'#2d1b69':'#ddd6fe',borderRadius:4},{label:'Travaux',data:bl.map(b=>b.trx),backgroundColor:'#f97316',borderRadius:4},{label:'Livrés',data:bl.map(b=>b.livres||b.liv||0),backgroundColor:'#10b981',borderRadius:4}]},options:{responsive:true,plugins:{legend:{labels:{font:{size:10},color:tc.color}}},scales:{x:{...gb,grid:{display:false}},y:gb}}});
+    // Donut états
+    const pie=document.getElementById('pieChart');
+    if(pie){
+      const labels=Object.values(SC).map(v=>v.s);
+      const data=Object.keys(SC).map(k=>byS[k]||0);
+      const nonZero=data.filter(d=>d>0).length;
+      S.charts.pie=new Chart(pie,{type:'doughnut',
+        data:{labels,datasets:[{data,backgroundColor:CC,borderWidth:2,borderColor:S.dark?'#1e293b':'#ffffff',hoverOffset:4}]},
+        options:{responsive:true,maintainAspectRatio:true,
+          plugins:{legend:{position:'bottom',labels:{font:{size:10},color:tc.color,padding:8,usePointStyle:true,pointStyleWidth:8}},
+          tooltip:{...TTC,callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed} BUS (${Math.round(ctx.parsed/(data.reduce((a,b)=>a+b,0)||1)*100)}%)`}}},
+          cutout:'60%'}});
     }
 
+    // Avancement par RR — horizontal bars
     const rrc=document.getElementById('rrChart');
     if(rrc){
-      const rrs=[...new Set(S.bus.map(b=>b.rr).filter(Boolean))].map(rr=>({rr:rr.split(' ')[0],av:Math.round(S.bus.filter(b=>b.rr===rr).reduce((a,b)=>a+b.av,0)/Math.max(1,S.bus.filter(b=>b.rr===rr).length))})).sort((a,b)=>b.av-a.av).slice(0,8);
-      S.charts.rr=new Chart(rrc,{type:'bar',data:{labels:rrs.map(r=>r.rr),datasets:[{data:rrs.map(r=>r.av),backgroundColor:dk?'#a78bfa':'#7c3aed',borderRadius:[0,4,4,0]}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{max:100,...gb,ticks:{...tc,callback:v=>v+'%'}},y:{grid:{display:false},ticks:tc}}}});
+      const rrs=[...new Set(S.bus.map(b=>b.rr).filter(Boolean))].map(rr=>({
+        rr:rr.length>12?rr.split(' ')[0]:rr,
+        av:Math.round(S.bus.filter(b=>b.rr===rr).reduce((a,b)=>a+b.av,0)/Math.max(1,S.bus.filter(b=>b.rr===rr).length)),
+        n:S.bus.filter(b=>b.rr===rr).length
+      })).sort((a,b)=>b.av-a.av).slice(0,8);
+      S.charts.rr=new Chart(rrc,{type:'bar',
+        data:{labels:rrs.map(r=>r.rr),datasets:[
+          {data:rrs.map(r=>r.av),backgroundColor:rrs.map(r=>r.av>=70?'#10b981':r.av>=40?'#f59e0b':'#f87171'),
+           borderRadius:4,barThickness:14}
+        ]},
+        options:{responsive:true,indexAxis:'y',
+          plugins:{legend:{display:false},tooltip:{...TTC,callbacks:{label:ctx=>`${ctx.parsed.x}% · ${rrs[ctx.dataIndex].n} BUS`}}},
+          scales:{
+            x:{max:100,grid:{color:S.dark?'#1e293b':'#f0f2f7'},ticks:{...tc,callback:v=>v+'%',font:{size:10}}},
+            y:{grid:{display:false},ticks:{...tc,font:{size:10}}}
+          }}});
     }
-
-    const lc=document.getElementById('lotLineChart');
-    if(lc){
-      const lots=S.stats.byLot||[];
-      S.charts.ll=new Chart(lc,{type:'bar',data:{labels:lots.map(b=>b.lot),datasets:[{label:'Avancement moy.',data:lots.map(b=>b.avMoy||0),backgroundColor:CC[0],borderRadius:4,yAxisID:'y'},{label:'BUS total',data:lots.map(b=>b.total),backgroundColor:CC[1],borderRadius:4,yAxisID:'y2'}]},options:{responsive:true,plugins:{legend:{labels:{font:{size:10},color:tc.color}}},scales:{y:{...gb,ticks:{...tc,callback:v=>v+'%'},max:100},y2:{position:'right',ticks:tc,grid:{display:false}}}}});
-    }
-  }
-}
+  }}
 
 // ── RENDER ────────────────────────────────────────
 const PAGES={prod:pageProd,kpi:pageKPI,bus:pageBUS,delivery:pageDelivery,travaux:pageTravaux,mesures:pageMesures,cdd:pageCDD,empl:pageEmpl,cpm:pageCPM,import:pageImport,settings:pageSettings};
