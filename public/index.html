@@ -113,13 +113,26 @@ const api = {
 };
 
 async function loadAll(){
-  try {
-    const [bus,delivery,mesures,cdd,emplacements,cpm,stats] = await Promise.all([
-      api.get('/api/bus'), api.get('/api/delivery'), api.get('/api/mesures'),
-      api.get('/api/cdd'), api.get('/api/emplacements'), api.get('/api/cpm'), api.get('/api/stats'),
-    ]);
-    Object.assign(S, {bus,delivery,mesures,cdd,emplacements,cpm,stats});
-  } catch(e){ notify('Erreur connexion serveur: '+e.message,'error'); }
+  // Chaque endpoint est chargé indépendamment — une erreur n'en bloque pas d'autres
+  async function safeFetch(url, fallback){
+    try {
+      const r = await fetch(url);
+      if(!r.ok) return fallback;
+      const ct = r.headers.get('content-type')||'';
+      if(!ct.includes('json')) return fallback; // évite de parser du HTML en JSON
+      return await r.json();
+    } catch(e){ return fallback; }
+  }
+  const [bus,delivery,mesures,cdd,emplacements,cpm,stats] = await Promise.all([
+    safeFetch('/api/bus',      []),
+    safeFetch('/api/delivery', []),
+    safeFetch('/api/mesures',  []),
+    safeFetch('/api/cdd',      []),
+    safeFetch('/api/emplacements', []),
+    safeFetch('/api/cpm',      []),
+    safeFetch('/api/stats',    {byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0}),
+  ]);
+  Object.assign(S, {bus,delivery,mesures,cdd,emplacements,cpm,stats});
 }
 
 // ── HELPERS ──────────────────────────────────────
