@@ -615,7 +615,7 @@ function pageKPI(){
       <div class="card" style="display:flex;flex-direction:column">
         <div class="section-title">Distribution des états</div>
         <div style="display:grid;grid-template-columns:1fr 180px;gap:16px;flex:1;align-items:center">
-          <canvas id="pieChart" style="max-height:230px"></canvas>
+          <div style="position:relative;width:100%;height:230px"><canvas id="pieChart"></canvas></div>
           <!-- Légende détaillée -->
           <div>
             ${Object.entries(SC).map(([k,v])=>{
@@ -1348,13 +1348,13 @@ function initCharts(){
     if(pie){
       const labels=Object.values(SC).map(v=>v.s);
       const data=Object.keys(SC).map(k=>byS[k]||0);
-      const nonZero=data.filter(d=>d>0).length;
       S.charts.pie=new Chart(pie,{type:'doughnut',
         data:{labels,datasets:[{data,backgroundColor:CC,borderWidth:2,borderColor:S.dark?'#1e293b':'#ffffff',hoverOffset:4}]},
-        options:{responsive:true,maintainAspectRatio:true,
-          plugins:{legend:{position:'bottom',labels:{font:{size:10},color:tc.color,padding:8,usePointStyle:true,pointStyleWidth:8}},
-          tooltip:{...TTC,callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed} BUS (${Math.round(ctx.parsed/(data.reduce((a,b)=>a+b,0)||1)*100)}%)`}}},
-          cutout:'60%'}});
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},
+          tooltip:{backgroundColor:S.dark?'#1e293b':'#fff',titleColor:S.dark?'#f1f5f9':'#1a1a2e',bodyColor:S.dark?'#94a3b8':'#4a5568',borderColor:S.dark?'#334155':'#e5e7eb',borderWidth:1,padding:8,cornerRadius:8,
+            callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed} BUS (${Math.round(ctx.parsed/(data.reduce((a,b)=>a+b,0)||1)*100)}%)`}}},
+          cutout:'62%'}});
     }
 
     // Avancement par RR — horizontal bars
