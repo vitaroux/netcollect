@@ -97,7 +97,7 @@ const NAV=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Da
 // ── STATE ────────────────────────────────────────
 const S={
   page:'prod', dark:false,
-  bus:[], delivery:[], mesures:[], cdd:[], emplacements:[], cpm:[], users:[],
+  bus:[], delivery:[], mesures:[], cdd:[], emplacements:[], cpm:[], users:[], currentUser:null,
   stats:{byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0},
   fq:'',fl:'',fe:'',fr:'',fk:'',sk:'id',sd:1,pg:0,
   modal:null, modalTab:'synthese', view:'table',
@@ -160,22 +160,88 @@ function destroyCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy();}ca
 // ── SIDEBAR ──────────────────────────────────────
 function renderSidebar(){
   const grps=[...new Set(NAV.map(n=>n.g))];
-  let h=`<div class="sb-logo"><div style="display:flex;align-items:center;gap:8px">
-    <div style="width:28px;height:28px;border-radius:8px;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px">⚡</div>
-    <div><div style="font-size:14px;font-weight:700;color:var(--text)">NetCollect</div><div style="font-size:10px;color:var(--mut)">Réseau BUS / Orange</div></div>
-  </div></div><div class="sb-nav">`;
+  const cu=S.currentUser;
+  const pc=PROFILE_COLORS[cu?.profil]||{bg:'var(--al)',c:'var(--acc)'};
+
+  // Initiales avatar
+  const initiales = cu
+    ? (cu.prenom[0]||'').toUpperCase()+(cu.nom[0]||'').toUpperCase()
+    : (S.userName||'?')[0].toUpperCase();
+
+  let h=`
+  <div class="sb-logo" style="padding:14px 14px 12px;border-bottom:1px solid var(--sbb)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:${cu?'10':'0'}px">
+      <div style="width:28px;height:28px;border-radius:8px;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">⚡</div>
+      <div><div style="font-size:14px;font-weight:700;color:var(--text)">NetCollect</div><div style="font-size:10px;color:var(--mut)">Réseau BUS / Orange</div></div>
+    </div>
+    ${cu ? `
+    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;background:var(--al);border-radius:8px;border:1px solid var(--brd)">
+      <div style="width:32px;height:32px;border-radius:50%;background:${pc.bg};border:2px solid ${pc.c};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${pc.c};flex-shrink:0">${initiales}</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(cu.prenom)} ${esc(cu.nom)}</div>
+        <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:${pc.bg};color:${pc.c};margin-top:2px">${cu.profil}</span>
+      </div>
+      <button id="switchUserBtn" title="Changer d'utilisateur" style="background:none;border:none;cursor:pointer;color:var(--mut);font-size:14px;flex-shrink:0;padding:2px">⇄</button>
+    </div>` : `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--th);border-radius:8px;border:1px dashed var(--brd);cursor:pointer" id="loginPrompt">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--brd);display:flex;align-items:center;justify-content:center;font-size:13px">👤</div>
+      <div style="font-size:11px;color:var(--mut)">Sélectionner un utilisateur</div>
+    </div>`}
+  </div>
+  <div class="sb-nav">`;
+
   grps.forEach(g=>{
     h+=`<div class="sb-grp">${g}</div>`;
     NAV.filter(n=>n.g===g).forEach(n=>{ h+=`<button class="sb-btn${S.page===n.id?' active':''}" data-page="${n.id}">${n.i} ${n.l}</button>`; });
   });
+
   h+=`</div><div class="sb-foot">
-    <div style="font-size:10px;color:var(--mut);margin-bottom:6px">👤 ${esc(S.userName)}</div>
-    <button class="btn sm" id="themeBtn" style="width:100%;justify-content:center;margin-bottom:4px">${S.dark?'☀ Mode clair':'🌙 Mode sombre'}</button>
-    <button class="btn sm" id="userBtn" style="width:100%;justify-content:center">Changer de nom</button>
+    <button class="btn sm" id="themeBtn" style="width:100%;justify-content:center">${S.dark?'☀ Mode clair':'🌙 Mode sombre'}</button>
   </div>`;
-  // Update sidebar user count
-  const userCount = S.users ? S.users.length : 0;
+
   document.getElementById('sidebar').innerHTML=h;
+}
+
+// ── MODAL SÉLECTION UTILISATEUR ──────────────────
+function openUserPicker(){
+  const users=S.users||[];
+  const mo=document.getElementById('mo-overlay');
+  mo.className='open';
+  const pc=u=>{const c=PROFILE_COLORS[u.profil]||{bg:'var(--al)',c:'var(--acc)'};return c;};
+  mo.innerHTML=`<div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Qui êtes-vous ?</div>
+      <button id="closePickerBtn" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--sub)">✕</button>
+    </div>
+    <div style="padding:16px 20px;max-height:360px;overflow-y:auto">
+      ${users.length===0
+        ? `<div style="text-align:center;padding:24px;color:var(--mut);font-size:12px">Aucun utilisateur créé.<br>Allez dans <strong>Utilisateurs</strong> pour en créer.</div>`
+        : users.map(u=>{const c=pc(u);const ini=(u.prenom[0]||'').toUpperCase()+(u.nom[0]||'').toUpperCase();return `
+        <div class="action-card" data-pick-user="${esc(u.id)}" style="margin-bottom:8px">
+          <div style="width:36px;height:36px;border-radius:50%;background:${c.bg};border:2px solid ${c.c};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${c.c};flex-shrink:0">${ini}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(u.prenom)} ${esc(u.nom)}</div>
+            <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:${c.bg};color:${c.c}">${u.profil}</span>
+          </div>
+          ${S.currentUser&&String(S.currentUser.id)===String(u.id)?'<span style="color:#10b981;font-size:14px">✓</span>':''}
+        </div>`;}).join('')}
+    </div>
+  </div>`;
+
+  document.getElementById('closePickerBtn')?.addEventListener('click',()=>{mo.className='';});
+  mo.addEventListener('click',e=>{if(e.target===mo)mo.className='';});
+  document.querySelectorAll('[data-pick-user]').forEach(el=>el.addEventListener('click',()=>{
+    const u=S.users.find(x=>String(x.id)===String(el.dataset.pickUser));
+    if(u){
+      S.currentUser=u;
+      S.userName=u.prenom+' '+u.nom;
+      localStorage.setItem('nc_user_id',String(u.id));
+      mo.className='';
+      renderSidebar();
+      bindPageEvents();
+      notify('Connecté en tant que '+u.prenom+' '+u.nom);
+    }
+  }));
 }
 
 // ── PAGES ─────────────────────────────────────────
@@ -1135,11 +1201,13 @@ function filterBus(){
 function bindPageEvents(){
   document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',()=>navigate(el.dataset.page)));
 
+  // User picker
+  document.getElementById('switchUserBtn')?.addEventListener('click', openUserPicker);
+  document.getElementById('loginPrompt')?.addEventListener('click', openUserPicker);
   const tb=document.getElementById('themeBtn');
   if(tb) tb.addEventListener('click',()=>{S.dark=!S.dark;document.body.classList.toggle('dk',S.dark);localStorage.setItem('nc_dark',S.dark?'1':'');renderSidebar();renderMain();});
 
-  const ub=document.getElementById('userBtn');
-  if(ub) ub.addEventListener('click',()=>{const u=prompt('Votre prénom / identifiant :',S.userName);if(u){S.userName=u;localStorage.setItem('nc_user',u);renderSidebar();}});
+
 
   const rb=document.getElementById('refreshBtn');
   if(rb) rb.addEventListener('click',async()=>{await loadAll();renderMain();notify('Données actualisées');});
@@ -1253,6 +1321,12 @@ document.getElementById('mo-overlay').addEventListener('click',async e=>{
 (async()=>{
   if(localStorage.getItem('nc_dark')==='1'){S.dark=true;document.body.classList.add('dk');}
   await loadAll();
+  // Restaurer l'utilisateur depuis localStorage
+  const savedUserId = localStorage.getItem('nc_user_id');
+  if(savedUserId && S.users.length){
+    const u=S.users.find(x=>String(x.id)===savedUserId);
+    if(u){ S.currentUser=u; S.userName=u.prenom+' '+u.nom; }
+  }
   renderSidebar();
   renderMain();
 })();
