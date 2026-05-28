@@ -198,7 +198,15 @@ const NAV=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Da
 // ── STATE ────────────────────────────────────────
 const S={
   page:'prod', dark:false,
-  bus:[], delivery:[], mesures:[], cdd:[], emplacements:[], cpm:[], users:[], cpmTab:null, currentUser:null,
+  bus:[], delivery:[], mesures:[], cdd:[], emplacements:[], cpm:[], users:[], cpmTab:null,
+  // Filtres par module
+  fBus:{q:'',lot:'',etat:'',rr:'',risque:''},
+  fDlv:{q:'',lot:'',cf:'',hRnv:'',cRnv:''},
+  fTrx:{q:'',lot:'',rr:'',risque:''},
+  fMes:{q:'',rr:'',moe:''},
+  fCdd:{q:'',lot:'',rr:'',dept:'',pfto:'',sin3:''},
+  fEpl:{q:'',lot:'',rr:'',dept:''},
+  fCpm:{q:'',lot:'',statut:''}, currentUser:null,
   stats:{byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0},
   fq:'',fl:'',fe:'',fr:'',fk:'',sk:'id',sd:1,pg:0,
   modal:null, modalTab:'synthese', view:'table',
@@ -591,6 +599,142 @@ async function deleteConfirm(msg, url) {
   catch(e){ notify(e.message,'error'); return false; }
 }
 
+
+// ═══════════════════════════════════════════════
+// FILTRES GLOBAUX
+// ═══════════════════════════════════════════════
+
+// Helper barre de filtre générique
+function filterBar(fields, stateKey, extraBtns=''){
+  const f = S[stateKey];
+  const hasFilter = Object.values(f).some(v=>v!=='');
+  const inputs = fields.map(field => {
+    if(field.type==='search') return `<input placeholder="${field.label}" value="${esc(f[field.key]||'')}" data-fkey="${field.key}" data-fstate="${stateKey}" class="flt-input" style="width:${field.width||'180px'}">`;
+    if(field.type==='select') return `<select data-fkey="${field.key}" data-fstate="${stateKey}" class="flt-select">
+      <option value="">${field.label}</option>
+      ${field.options.map(o=>typeof o==='string'?`<option${f[field.key]===o?' selected':''}>${o}</option>`:`<option value="${o.v}"${f[field.key]===o.v?' selected':''}>${o.l}</option>`).join('')}
+    </select>`;
+    return '';
+  }).join('');
+  return `<div class="card" style="padding:10px;margin-bottom:12px">
+    <div class="flt-bar">
+      ${inputs}
+      ${hasFilter?`<button class="btn sm" data-clear-fstate="${stateKey}" style="color:#ef4444;border-color:rgba(239,68,68,.3)">✕ Effacer</button>`:''}
+      ${extraBtns}
+    </div>
+    ${hasFilter?`<div style="font-size:11px;color:var(--mut);margin-top:6px">Filtres actifs — <span style="color:var(--acc);font-weight:600">${Object.values(f).filter(v=>v).length} filtre(s)</span></div>`:''}
+  </div>`;
+}
+
+// Filtres Delivery
+function filterDelivery(){
+  const f=S.fDlv;
+  return S.delivery.filter(d=>{
+    const b=S.bus.find(x=>x.id===d.topo)||{};
+    if(f.q && !d.topo.toLowerCase().includes(f.q.toLowerCase())) return false;
+    if(f.lot && d.lot!==f.lot) return false;
+    if(f.cf && d.cf!==f.cf) return false;
+    if(f.hRnv && d.hRnv!==f.hRnv) return false;
+    if(f.cRnv && d.cRnv!==f.cRnv) return false;
+    return true;
+  });
+}
+
+// Filtres Travaux
+function filterTravaux(){
+  const f=S.fTrx;
+  return S.bus.filter(b=>{
+    if(![3,4,5].includes(b.etat)) return false;
+    if(f.q && !b.id.toLowerCase().includes(f.q.toLowerCase()) && !b.rr.toLowerCase().includes(f.q.toLowerCase())) return false;
+    if(f.lot && b.lot!==f.lot) return false;
+    if(f.rr && !b.rr.toLowerCase().includes(f.rr.toLowerCase())) return false;
+    if(f.risque && b.risque!==f.risque) return false;
+    return true;
+  });
+}
+
+// Filtres Mesures
+function filterMesures(){
+  const f=S.fMes;
+  return S.mesures.filter(m=>{
+    if(f.q && !m.topo.toLowerCase().includes(f.q.toLowerCase()) && !m.rr.toLowerCase().includes(f.q.toLowerCase())) return false;
+    if(f.rr && !m.rr.toLowerCase().includes(f.rr.toLowerCase())) return false;
+    if(f.moe && m.moe!==f.moe) return false;
+    return true;
+  });
+}
+
+// Filtres CDD
+function filterCDD(){
+  const f=S.fCdd;
+  return S.cdd.filter(c=>{
+    if(f.q && !c.topo.toLowerCase().includes(f.q.toLowerCase()) && !c.ns.toLowerCase().includes(f.q.toLowerCase()) && !c.sc.toLowerCase().includes(f.q.toLowerCase())) return false;
+    if(f.lot && c.lot!==f.lot) return false;
+    if(f.rr && !c.rr.toLowerCase().includes(f.rr.toLowerCase())) return false;
+    if(f.dept && c.dept!==f.dept) return false;
+    if(f.pfto && c.pfto!==f.pfto) return false;
+    if(f.sin3 && c.sin3!==f.sin3) return false;
+    return true;
+  });
+}
+
+// Filtres Emplacements
+function filterEmpl(){
+  const f=S.fEpl;
+  return S.emplacements.filter(e=>{
+    if(f.q && !e.topo.toLowerCase().includes(f.q.toLowerCase()) && !e.site.toLowerCase().includes(f.q.toLowerCase())) return false;
+    if(f.lot && e.lot!==f.lot) return false;
+    if(f.rr && !e.rr.toLowerCase().includes(f.rr.toLowerCase())) return false;
+    if(f.dept && e.dept!==f.dept) return false;
+    return true;
+  });
+}
+
+// Filtres CPM
+function filterCPM(){
+  const f=S.fCpm;
+  const allTopos=[...new Set([...S.bus.map(b=>b.id),...S.cpm.map(c=>c.topo)])].sort();
+  return allTopos.map(id=>{
+    const b=S.bus.find(x=>x.id===id)||{};
+    const c=S.cpm.find(x=>x.topo===id)||null;
+    return {id,lot:b.lot||'',rr:b.rr||'',etat:b.etat??0,cpm:c};
+  }).filter(r=>{
+    if(f.q && !r.id.toLowerCase().includes(f.q.toLowerCase())) return false;
+    if(f.lot && r.lot!==f.lot) return false;
+    if(f.statut){
+      const s=r.cpm?r.cpm.statut:'Non reçu';
+      if(s!==f.statut) return false;
+    }
+    return true;
+  });
+}
+
+// Bind filter events (appelé dans bindPageEvents)
+function bindFilterEvents(){
+  // Inputs texte
+  document.querySelectorAll('.flt-input').forEach(el=>{
+    el.addEventListener('input',()=>{
+      S[el.dataset.fstate][el.dataset.fkey]=el.value;
+      S.pg=0; renderMain();
+    });
+  });
+  // Selects
+  document.querySelectorAll('.flt-select').forEach(el=>{
+    el.addEventListener('change',()=>{
+      S[el.dataset.fstate][el.dataset.fkey]=el.value;
+      S.pg=0; renderMain();
+    });
+  });
+  // Clear buttons
+  document.querySelectorAll('[data-clear-fstate]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const k=el.dataset.clearFstate;
+      Object.keys(S[k]).forEach(f=>S[k][f]='');
+      S.pg=0; renderMain();
+    });
+  });
+}
+
 function renderSidebar(){
   const grps=[...new Set(NAV.map(n=>n.g))];
   const cu=S.currentUser;
@@ -950,7 +1094,7 @@ function pageBUS(){
   const st=k=>S.sk===k?(S.sd>0?' ↑':' ↓'):'';
   return `<div class="page">
     <div class="page-hdr">
-      <div><div class="page-title">BUS / Topologies</div><div class="page-sub">${flt.length} résultats · ${S.bus.length} total</div></div>
+      <div><div class="page-title">BUS / Topologies</div><div class="page-sub">${flt.length} résultat(s) sur ${S.bus.length} BUS${flt.length<S.bus.length?' <span style="color:var(--acc)">· filtre actif</span>':''}</div></div>
       <div style="display:flex;gap:8px">
         <button class="btn" onclick="window.open('/api/export','_blank')">↓ Export Excel</button>
         <button class="btn" id="csvBtn">↓ CSV</button>
@@ -1012,6 +1156,13 @@ function pageDelivery(){
   return `<div class="page">
     <div class="page-hdr"><div><div class="page-title">Suivi Delivery</div><div class="page-sub">HEPOC · CPM · Commandes fermes</div></div>
       <button class="btn" onclick="window.open('/api/export','_blank')">↓ Export Excel</button></div>
+    ${filterBar([
+      {type:'search',key:'q',label:'Rechercher topo...',width:'200px'},
+      {type:'select',key:'lot',label:'Tous lots',options:['LOT1','LOT2','LOT3']},
+      {type:'select',key:'cf',label:'Cmd ferme',options:[{v:'OUI',l:'Cmd ferme OUI'},{v:'NON',l:'Cmd ferme NON'}]},
+      {type:'select',key:'hRnv',label:'HEPOC renvoyé',options:[{v:'OUI',l:'HEPOC renvoyé OUI'},{v:'NON',l:'HEPOC renvoyé NON'}]},
+      {type:'select',key:'cRnv',label:'CPM renvoyé',options:[{v:'OUI',l:'CPM renvoyé OUI'},{v:'NON',l:'CPM renvoyé NON'}]},
+    ],'fDlv')}
     <div class="kpi4" style="margin-bottom:16px">
       ${krow('Cmd fermes',S.delivery.filter(d=>d.cf==='OUI').length,'#10b981','✓','')}
       ${krow('En attente',S.delivery.filter(d=>d.cf==='NON').length,'#f59e0b','⏳','')}
@@ -1020,7 +1171,7 @@ function pageDelivery(){
     </div>
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
       <thead><tr>${COLS.map(([,l])=>`<th>${l}</th>`).join('')}</tr></thead>
-      <tbody>${S.delivery.map((d,i)=>`<tr class="${i%2?'odd':'even'}">
+      <tbody>${filterDelivery().map((d,i)=>`<tr class="${i%2?'odd':'even'}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(d.topo)}</span></td>
         <td><span class="lot-badge">${d.lot}</span></td>
         ${COLS.slice(2).map(([k])=>`<td>${obadge(d[k])}</td>`).join('')}
@@ -1051,15 +1202,21 @@ function pageTravaux(){
         <button class="btn sm primary" id="vTable">📋 Tableau</button>
         <button class="btn sm" id="vKanban">🗂 Kanban</button>
       </div></div>
+    ${filterBar([
+      {type:'search',key:'q',label:'Rechercher topo / RR...',width:'200px'},
+      {type:'select',key:'lot',label:'Tous lots',options:['LOT1','LOT2','LOT3']},
+      {type:'select',key:'rr',label:'Tous RR',options:[...new Set(S.bus.map(b=>b.rr).filter(Boolean))].sort().slice(0,20)},
+      {type:'select',key:'risque',label:'Risque',options:['Faible','Moyen','Élevé']},
+    ],'fTrx')}
     <div class="kpi4" style="margin-bottom:16px">
-      ${krow('Éd. Plans',S.bus.filter(b=>b.etat===3).length,'#f59e0b','📄','')}
-      ${krow('En travaux',S.bus.filter(b=>b.etat===4).length,'#f97316','🏗','')}
-      ${krow('Livrés',S.bus.filter(b=>b.etat===5).length,'#10b981','✓','')}
-      ${krow('Risques ↑',trx.filter(b=>b.risque==='Élevé').length,'#ef4444','⚠','')}
+      ${krow('Éd. Plans',filterTravaux().filter(b=>b.etat===3).length,'#f59e0b','📄','')}
+      ${krow('En travaux',filterTravaux().filter(b=>b.etat===4).length,'#f97316','🏗','')}
+      ${krow('Livrés',filterTravaux().filter(b=>b.etat===5).length,'#10b981','✓','')}
+      ${krow('Risques ↑',filterTravaux().filter(b=>b.risque==='Élevé').length,'#ef4444','⚠','')}
     </div>
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
       <thead><tr><th>Topologie</th><th>Lot</th><th>RR</th><th>État</th><th>Avancement</th><th>Livraison</th><th>Risque</th><th>Commentaire</th></tr></thead>
-      <tbody>${trx.map((b,i)=>`<tr class="trow ${i%2?'odd':'even'}" data-busid="${esc(b.id)}">
+      <tbody>${filterTravaux().map((b,i)=>`<tr class="trow ${i%2?'odd':'even'}" data-busid="${esc(b.id)}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(b.id)}</span></td>
         <td><span class="lot-badge">${b.lot}</span></td>
         <td style="color:var(--sub);font-size:11px">${esc(b.rr)}</td>
@@ -1078,15 +1235,18 @@ function pageMesures(){
   return `<div class="page">
     <div class="page-hdr"><div><div class="page-title">Suivi Mesures</div><div class="page-sub">Tronçons · Accès MOE · Résultats</div></div>
       <button class="btn primary" id="newMesBtn">+ Ajouter mesure</button></div>
+    ${filterBar([
+      {type:'search',key:'q',label:'Rechercher topo / RR...',width:'200px'},
+      {type:'select',key:'rr',label:'Tous RR',options:[...new Set(S.mesures.map(m=>m.rr).filter(Boolean))].sort().slice(0,20)},
+      {type:'select',key:'moe',label:'Accès MOE',options:[{v:'Ok',l:'MOE Ok'},{v:'Nok',l:'MOE Nok'}]},
+    ],'fMes')}
+    ${(()=>{const fmes=filterMesures();const ft={nbT:fmes.reduce((a,m)=>a+m.nbT,0),nbM:fmes.reduce((a,m)=>a+m.nbM,0),ok:fmes.reduce((a,m)=>a+m.ok,0),nok:fmes.reduce((a,m)=>a+m.nok,0)};return '<div style=\'display:none\' id=\'fmesData\'></div>';})()} 
     <div class="kpi4" style="margin-bottom:16px">
-      ${krow('Total tronçons',tot.nbT,'#6b7280','📏','')}
-      ${krow('Mesurés',tot.nbM,'#3b82f6','📊',tot.nbT?Math.round(tot.nbM/tot.nbT*100)+'%':'')}
-      ${krow('OK',tot.ok,'#10b981','✓','')}
-      ${krow('NOK',tot.nok,'#ef4444','✗','')}
+      ${(()=>{const fm=filterMesures();const t={nbT:fm.reduce((a,m)=>a+m.nbT,0),nbM:fm.reduce((a,m)=>a+m.nbM,0),ok:fm.reduce((a,m)=>a+m.ok,0),nok:fm.reduce((a,m)=>a+m.nok,0)};return krow('Total tronçons',t.nbT,'#6b7280','📏','')+krow('Mesurés',t.nbM,'#3b82f6','📊',t.nbT?Math.round(t.nbM/t.nbT*100)+'%':'')+krow('OK',t.ok,'#10b981','✓','')+krow('NOK',t.nok,'#ef4444','✗','');})()}
     </div>
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
       <thead><tr><th>Topologie</th><th>RR</th><th>Tronçons</th><th>Accès MOE</th><th>Mesurés</th><th>OK</th><th>NOK</th><th>Taux mesure</th><th>Taux échec</th><th style="text-align:center">Actions</th></tr></thead>
-      <tbody>${S.mesures.map((m,i)=>{const tE=(m.ok+m.nok)?Math.round(m.nok/(m.ok+m.nok)*100):0;return`<tr class="${i%2?'odd':'even'}">
+      <tbody>${filterMesures().map((m,i)=>{const tE=(m.ok+m.nok)?Math.round(m.nok/(m.ok+m.nok)*100):0;return`<tr class="${i%2?'odd':'even'}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(m.topo)}</span></td>
         <td style="color:var(--sub);font-size:11px">${esc(m.rr)}</td>
         <td>${m.nbT}</td><td>${obadge(m.moe)}</td><td>${m.nbM}</td>
@@ -1109,14 +1269,22 @@ function pageCDD(){
   return `<div class="page">
     <div class="page-hdr"><div><div class="page-title">Suivi CDD</div><div class="page-sub">Commandes COL · SIN3 · PFTO</div></div>
       <button class="btn primary" id="newCDDBtn">+ Ajouter CDD</button></div>
+    ${filterBar([
+      {type:'search',key:'q',label:'Topo / Site / Code...',width:'200px'},
+      {type:'select',key:'lot',label:'Tous lots',options:['LOT1','LOT2','LOT3']},
+      {type:'select',key:'rr',label:'Tous RR',options:[...new Set(S.cdd.map(c=>c.rr).filter(Boolean))].sort().slice(0,20)},
+      {type:'select',key:'dept',label:'Dept',options:[...new Set(S.cdd.map(c=>c.dept).filter(Boolean))].sort().slice(0,15)},
+      {type:'select',key:'pfto',label:'PFTO',options:[{v:'OUI',l:'PFTO lancé'},{v:'NON',l:'PFTO non lancé'}]},
+      {type:'select',key:'sin3',label:'SIN3',options:[{v:'OUI',l:'SIN3 MAJ'},{v:'NON',l:'SIN3 non MAJ'}]},
+    ],'fCdd')}
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
-      ${krow('Total sites',S.cdd.length,'#6b7280','📍','')}
-      ${krow('PFTO lancé',S.cdd.filter(c=>c.pfto==='OUI').length,'#10b981','✓','')}
-      ${krow('SIN3 non MAJ',S.cdd.filter(c=>c.sin3==='NON').length,'#ef4444','⚠','')}
+      ${krow('Résultats',filterCDD().length,'#6b7280','📍','/ '+S.cdd.length+' total')}
+      ${krow('PFTO lancé',filterCDD().filter(c=>c.pfto==='OUI').length,'#10b981','✓','')}
+      ${krow('SIN3 non MAJ',filterCDD().filter(c=>c.sin3==='NON').length,'#ef4444','⚠','')}
     </div>
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
       <thead><tr><th>Topologie</th><th>Lot</th><th>Dept</th><th>RR</th><th>Site Code</th><th>Nom</th><th>Date MAD</th><th>N° commande</th><th>PFTO</th><th>SIN3</th><th>Commentaire</th><th style="text-align:center">Actions</th></tr></thead>
-      <tbody>${S.cdd.map((c,i)=>`<tr class="${i%2?'odd':'even'}">
+      <tbody>${filterCDD().map((c,i)=>`<tr class="${i%2?'odd':'even'}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(c.topo)}</span></td>
         <td><span class="lot-badge">${c.lot}</span></td>
         <td style="color:var(--sub)">${c.dept}</td>
@@ -1143,9 +1311,15 @@ function pageEmpl(){
   return `<div class="page">
     <div class="page-hdr"><div><div class="page-title">Suivi Emplacements</div><div class="page-sub">Annexes · RDV · Installation · Consuel</div></div>
       <button class="btn primary" id="newEmplBtn">+ Ajouter emplacement</button></div>
+    ${filterBar([
+      {type:'search',key:'q',label:'Topo / Site...',width:'200px'},
+      {type:'select',key:'lot',label:'Tous lots',options:['LOT1','LOT2','LOT3']},
+      {type:'select',key:'rr',label:'Tous RR',options:[...new Set(S.emplacements.map(e=>e.rr).filter(Boolean))].sort().slice(0,20)},
+      {type:'select',key:'dept',label:'Dept',options:[...new Set(S.emplacements.map(e=>e.dept).filter(Boolean))].sort().slice(0,15)},
+    ],'fEpl')}
     <div class="tbl-wrap"><div style="overflow-x:auto"><table>
       <thead><tr><th>Topologie</th><th>Lot</th><th>Site</th><th>Dept</th><th>RR</th><th>Équipe</th><th>RDV</th><th>Annexe B</th><th>Install.</th><th>Consuel</th><th>Annexe C</th><th style="text-align:center">Actions</th></tr></thead>
-      <tbody>${S.emplacements.map((e,i)=>`<tr class="${i%2?'odd':'even'}">
+      <tbody>${filterEmpl().map((e,i)=>`<tr class="${i%2?'odd':'even'}">
         <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(e.topo)}</span></td>
         <td><span class="lot-badge">${e.lot}</span></td>
         <td><span class="mono">${e.site}</span></td>
@@ -1373,10 +1547,11 @@ function pageCPM(){
     if(r.cpm) return '<button class="btn sm" data-cpmtopo="'+esc(r.id)+'" style="color:var(--acc);border-color:var(--acc)">&#128203; Détail</button>';
     return '<label style="display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:7px;border:1px solid var(--brd);color:var(--sub);font-size:12px;cursor:pointer">&#128225; Importer<input type="file" accept=".xlsx" data-bustopo="'+esc(r.id)+'" class="cpmRowInput" style="display:none"></label>';
   }
-  const recu   = rows.filter(r=>r.cpm).length;
-  const valide = rows.filter(r=>r.cpm&&r.cpm.statut==='Validé').length;
-  const bloque = rows.filter(r=>r.cpm&&r.cpm.statut==='Bloqué').length;
-  const tableRows = rows.map((r,i)=>[
+  const filteredRows = filterCPM();
+  const recu   = filteredRows.filter(r=>r.cpm).length;
+  const valide = filteredRows.filter(r=>r.cpm&&r.cpm.statut==='Validé').length;
+  const bloque = filteredRows.filter(r=>r.cpm&&r.cpm.statut==='Bloqué').length;
+  const tableRows = filteredRows.map((r,i)=>[
     '<tr class="'+(i%2?'odd':'even')+'">',
     '<td><span class="mono" style="color:var(--acc);font-weight:600">'+esc(r.id)+'</span></td>',
     '<td><span class="lot-badge">'+(r.lot||'–')+'</span></td>',
@@ -1392,6 +1567,12 @@ function pageCPM(){
     '</tr>',
   ].join('')).join('');
 
+  const cpmFilterBar = filterBar([
+    {type:'search',key:'q',label:'Rechercher topo...',width:'200px'},
+    {type:'select',key:'lot',label:'Tous lots',options:['LOT1','LOT2','LOT3']},
+    {type:'select',key:'statut',label:'Tous statuts',options:['Non reçu','CRMAD reçu','En vérification','Validé','Bloqué']},
+  ],'fCpm');
+  const totalRows = [...new Set([...S.bus.map(b=>b.id),...S.cpm.map(c=>c.topo)])].length;
   return [
     '<div class="page">',
     '<div class="page-hdr">',
@@ -1402,6 +1583,8 @@ function pageCPM(){
     '<label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:1px solid var(--acc);background:var(--al);color:var(--acc);font-size:13px;font-weight:500;cursor:pointer">',
     '&#128225; Importer CRMAD <input type="file" id="cpmFileInput" accept=".xlsx" style="display:none"></label>',
     '</div></div>',
+    cpmFilterBar,
+    '<div style="font-size:12px;color:var(--sub);margin-bottom:12px">'+filteredRows.length+' résultat(s) sur '+totalRows+' BUS</div>',
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">',
     krow('Total BUS',rows.length,'#6b7280','🔌',''),
     krow('CRMAD reçus',recu,'#3b82f6','📡',rows.length?Math.round(recu/rows.length*100)+'%':''),
@@ -1761,6 +1944,8 @@ function bindPageEvents(){
   const pn=document.getElementById('pgNext');if(pn)pn.addEventListener('click',()=>{const tp=Math.ceil(filterBus().length/12);S.pg=Math.min(tp-1,S.pg+1);renderMain();});
   document.querySelectorAll('[data-pg]').forEach(el=>el.addEventListener('click',()=>{S.pg=+el.dataset.pg;renderMain();}));
 
+  // Filtres
+  bindFilterEvents();
   // Users events
   bindUsersEvents();
 
