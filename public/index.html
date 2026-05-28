@@ -819,6 +819,209 @@ function bindFilterEvents(){
   });
 }
 
+
+// ═══════════════════════════════════════════════
+// SCHÉMA TOPOLOGIQUE BUS
+// ═══════════════════════════════════════════════
+function buildTopoSchema(segs, hepoc, cpmData){
+  if(!segs || segs.length === 0){
+    return '<div style="text-align:center;padding:40px;color:var(--mut)">Aucun segment disponible pour construire le schéma.</div>';
+  }
+
+  // ── 1. Construire le graphe ──────────────────
+  const nodes = {};   // id → {id, type, nom, x, y, nb_fo}
+  const edges = [];   // {from, to, type, length, label}
+
+  // Types de couleurs par type de segment
+  const edgeColors = {
+    'CPM_NRO_CO':    '#3b82f6',
+    'CPM_NRO_NRO':   '#8b5cf6',
+    'CPM_CO_CO':     '#10b981',
+    'CPM_CO_NRABTS': '#f59e0b',
+  };
+
+  // Sites HEPOC = nœuds CO principaux
+  const coNodes = new Set(hepoc.map(h => h.code_site));
+  const coNames = {};
+  hepoc.forEach(h => { coNames[h.code_site] = h.nom_site || h.code_site; });
+
+  // RecapMAD pour les FO
+  const foMap = {};
+  (cpmData.sites||[]).forEach(s => { foMap[s.code] = s.nb_fo; });
+
+  // Collecter tous les nœuds depuis les segments CPM uniquement
+  const cpmSegs = segs.filter(s => s.type && s.type.startsWith('CPM_') && !s.type.includes('NRABTS'));
+  cpmSegs.forEach(s => {
+    [s.ext_a, s.ext_b].forEach(id => {
+      if(!id) return;
+      if(!nodes[id]){
+        const isCO = coNodes.has(id);
+        nodes[id] = {
+          id, x:0, y:0,
+          type: isCO ? 'CO' : 'NRO',
+          nom: coNames[id] || id,
+          nb_fo: foMap[id] || 0,
+        };
+      }
+    });
+    edges.push({
+      from: s.ext_a, to: s.ext_b,
+      type: s.type,
+      length: s.longueur || 0,
+      label: Math.round((s.longueur||0)/1000*10)/10 + ' km',
+      color: edgeColors[s.type] || '#888',
+    });
+  });
+
+  const nodeList = Object.values(nodes);
+  const coList   = nodeList.filter(n => n.type === 'CO');
+  const nroList  = nodeList.filter(n => n.type === 'NRO');
+
+  // ── 2. Layout ───────────────────────────────
+  const W = 900, H = 540, cx = W/2, cy = H/2;
+  const PAD = 80;
+
+  // CO nodes : cercle central ou ligne horizontale
+  if(coList.length === 1){
+    coList[0].x = cx; coList[0].y = cy;
+  } else if(coList.length === 2){
+    coList[0].x = cx - 180; coList[0].y = cy;
+    coList[1].x = cx + 180; coList[1].y = cy;
+  } else {
+    coList.forEach((n,i) => {
+      const angle = (i / coList.length) * 2 * Math.PI - Math.PI/2;
+      const r = Math.min(W, H) * 0.22;
+      n.x = cx + r * Math.cos(angle);
+      n.y = cy + r * Math.sin(angle);
+    });
+  }
+
+  // NRO nodes : positionnés autour du CO le plus proche
+  // Trouver le CO cible de chaque NRO
+  const nroTarget = {};
+  edges.forEach(e => {
+    const fromCO = nodes[e.from]?.type === 'CO';
+    const toCO   = nodes[e.to]?.type === 'CO';
+    if(!fromCO && toCO)   nroTarget[e.from] = e.to;
+    if(fromCO && !toCO)   nroTarget[e.to]   = e.from;
+    if(!fromCO && !toCO){ // NRO-NRO : assign to chain
+      if(!nroTarget[e.from]) nroTarget[e.from] = e.to;
+    }
+  });
+  // Résoudre les chaînes NRO-NRO jusqu'au CO
+  function resolveTarget(id, depth=0){
+    if(depth > 10) return null;
+    if(nodes[id]?.type === 'CO') return id;
+    const t = nroTarget[id];
+    if(!t) return null;
+    return resolveTarget(t, depth+1);
+  }
+  nroList.forEach(n => { n.targetCO = resolveTarget(n.id); });
+
+  // Grouper les NRO par CO cible
+  const nroGroups = {};
+  coList.forEach(co => { nroGroups[co.id] = []; });
+  nroList.forEach(n => {
+    const t = n.targetCO || (coList[0]?.id);
+    if(t && nroGroups[t]) nroGroups[t].push(n);
+    else if(coList[0]) nroGroups[coList[0].id].push(n);
+  });
+
+  // Positionner les NRO en arc autour de leur CO
+  coList.forEach(co => {
+    const group = nroGroups[co.id] || [];
+    if(!group.length) return;
+    const baseAngle = Math.atan2(co.y - cy, co.x - cx);
+    const spread = Math.min(Math.PI * 1.1, Math.PI * group.length / 5);
+    const r = 175;
+    group.forEach((n, i) => {
+      const angle = baseAngle + (i - (group.length-1)/2) * (spread / Math.max(1, group.length-1));
+      n.x = co.x + r * Math.cos(angle);
+      n.y = co.y + r * Math.sin(angle);
+      // Clamp to canvas
+      n.x = Math.max(PAD, Math.min(W-PAD, n.x));
+      n.y = Math.max(PAD, Math.min(H-PAD, n.y));
+    });
+  });
+
+  // ── 3. SVG ──────────────────────────────────
+  const dk = document.body.classList.contains('dk');
+  const bg = dk ? '#1e293b' : '#f8f9fc';
+  const textC = dk ? '#f1f5f9' : '#1a1a2e';
+  const subC  = dk ? '#94a3b8' : '#4a5568';
+  const brdC  = dk ? '#334155' : '#d4d9e8';
+
+  let svgEdges = '';
+  let svgLabels = '';
+
+  edges.forEach(e => {
+    const a = nodes[e.from], b = nodes[e.to];
+    if(!a || !b) return;
+    const mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+    // Courbe légère
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const perp = {x: -dy * 0.15, y: dx * 0.15};
+    const cpx = mx + perp.x, cpy = my + perp.y;
+    svgEdges += `<path d="M${a.x},${a.y} Q${cpx},${cpy} ${b.x},${b.y}" 
+      fill="none" stroke="${e.color}" stroke-width="2" stroke-opacity="0.7"
+      title="${e.from} → ${e.to} · ${e.label}">
+      <title>${esc(e.type)} : ${esc(e.from)} → ${esc(e.to)} · ${esc(e.label)}</title>
+    </path>`;
+    svgLabels += `<text x="${cpx}" y="${cpy - 5}" text-anchor="middle" font-size="9" fill="${e.color}" font-family="monospace" opacity="0.9">${esc(e.label)}</text>`;
+  });
+
+  let svgNodes = '';
+  nodeList.forEach(n => {
+    const isCO = n.type === 'CO';
+    const r   = isCO ? 28 : 18;
+    const fc  = isCO ? '#7c3aed' : '#3b82f6';
+    const tc  = '#ffffff';
+    const lbl = n.nom.length > 10 ? n.nom.slice(0,9)+'…' : n.nom;
+    const code = n.id.length > 8 ? n.id.slice(0,8) : n.id;
+    svgNodes += `<g class="topo-node" style="cursor:pointer">
+      <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${fc}" stroke="${isCO?'#fff':'#bfdbfe'}" stroke-width="${isCO?2:1.5}" opacity="0.92">
+        <title>${esc(n.id)} — ${esc(n.type)}${n.nb_fo?' — '+n.nb_fo+' FO':''}</title>
+      </circle>
+      <text x="${n.x}" y="${n.y+1}" text-anchor="middle" dominant-baseline="central" font-size="${isCO?9:8}" font-weight="${isCO?'700':'500'}" fill="${tc}" font-family="monospace">${esc(code)}</text>
+      <text x="${n.x}" y="${n.y+r+12}" text-anchor="middle" font-size="${isCO?11:9}" font-weight="${isCO?'600':'400'}" fill="${isCO?fc:subC}" font-family="-apple-system,sans-serif">${esc(lbl)}</text>
+      ${n.nb_fo ? `<text x="${n.x}" y="${n.y+r+23}" text-anchor="middle" font-size="9" fill="${subC}" font-family="monospace">${n.nb_fo} FO</text>` : ''}
+    </g>`;
+  });
+
+  // Légende
+  const legendTypes = [...new Set(edges.map(e=>e.type))];
+  let legend = '';
+  legendTypes.forEach((t,i) => {
+    const col = edgeColors[t]||'#888';
+    legend += `<g transform="translate(${16},${H-90+i*16})">
+      <line x1="0" y1="0" x2="22" y2="0" stroke="${col}" stroke-width="2.5"/>
+      <text x="27" y="4" font-size="10" fill="${subC}" font-family="sans-serif">${esc(t)}</text>
+    </g>`;
+  });
+  legend += `<g transform="translate(${16},${H-90+legendTypes.length*16+6})">
+    <circle cx="11" cy="0" r="7" fill="#7c3aed"/><text x="22" y="4" font-size="10" fill="${subC}" font-family="sans-serif">CO (nœud optique)</text>
+  </g>`;
+  legend += `<g transform="translate(${16},${H-90+legendTypes.length*16+22})">
+    <circle cx="11" cy="0" r="5" fill="#3b82f6"/><text x="22" y="4" font-size="10" fill="${subC}" font-family="sans-serif">NRO (nœud réseau)</text>
+  </g>`;
+
+  return `<div style="overflow:auto">
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px">
+      ${nodeList.length} nœuds · ${edges.length} segments · ${cpmData.nb_fo_total||0} FO total · ${Math.round((cpmData.longueur_totale||0)/1000)} km
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="background:${bg};border-radius:10px;border:1px solid ${brdC};max-height:540px" xmlns="http://www.w3.org/2000/svg">
+      <!-- Edges -->
+      <g id="edges">${svgEdges}</g>
+      <!-- Labels -->
+      <g id="edge-labels">${svgLabels}</g>
+      <!-- Nodes -->
+      <g id="nodes">${svgNodes}</g>
+      <!-- Légende -->
+      <g id="legend">${legend}</g>
+    </svg>
+  </div>`;
+}
+
 function renderSidebar(){
   const grps=[...new Set(getNav().map(n=>n.g))];
   const cu=S.currentUser;
