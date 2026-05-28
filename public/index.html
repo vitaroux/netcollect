@@ -241,7 +241,8 @@ select option{background:var(--card)}
 const SC={0:{s:'Non démarré',v:'t0'},1:{s:'Design',v:'t1'},2:{s:'Delivery',v:'t2'},3:{s:'Éd. Plans',v:'t3'},4:{s:'Travaux',v:'t4'},5:{s:'Livré',v:'t5'},6:{s:'MES',v:'t6'}};
 const RC={Faible:{bg:'var(--t5bg)',c:'var(--t5c)'},Moyen:{bg:'var(--t3bg)',c:'var(--t3c)'},Élevé:{bg:'rgba(239,68,68,.1)',c:'#ef4444'}};
 const CC=['#7c3aed','#3b82f6','#06b6d4','#10b981','#f59e0b','#f97316','#ef4444'];
-const NAV=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Dashboard KPI',g:'Dashboards',i:'📊'},{id:'bus',l:'BUS / Topologies',g:'Modules',i:'🔌'},{id:'delivery',l:'Delivery',g:'Modules',i:'📦'},{id:'travaux',l:'Travaux',g:'Modules',i:'🏗'},{id:'mesures',l:'Mesures',g:'Modules',i:'📐'},{id:'cdd',l:'CDD',g:'Modules',i:'📋'},{id:'empl',l:'Emplacements',g:'Modules',i:'📍'},{id:'cpm',l:'CPM / CRMAD',g:'Modules',i:'📡'},{id:'users',l:'Utilisateurs',g:'Config',i:'👥'},{id:'import',l:'Import Excel',g:'Config',i:'📥'},{id:'settings',l:'Paramétrage',g:'Config',i:'⚙'}];
+const NAV_ALL=[{id:'prod',l:'Dashboard Prod',g:'Dashboards',i:'⚡'},{id:'kpi',l:'Dashboard KPI',g:'Dashboards',i:'📊'},{id:'bus',l:'BUS / Topologies',g:'Modules',i:'🔌'},{id:'delivery',l:'Delivery',g:'Modules',i:'📦'},{id:'travaux',l:'Travaux',g:'Modules',i:'🏗'},{id:'mesures',l:'Mesures',g:'Modules',i:'📐'},{id:'cdd',l:'CDD',g:'Modules',i:'📋'},{id:'empl',l:'Emplacements',g:'Modules',i:'📍'},{id:'cpm',l:'CPM / CRMAD',g:'Modules',i:'📡'},{id:'users',l:'Utilisateurs',g:'Config',i:'👥'},{id:'import',l:'Import Excel',g:'Config',i:'📥'},{id:'settings',l:'Paramétrage',g:'Config',i:'⚙'}];
+function getNav(){ const p=S.currentUser?.profil; if(p==='Pilote'||p==='CDP'||p==='CDR'||p==='BE') return NAV_ALL.filter(n=>n.id!=='users'); return NAV_ALL; }
 
 // ── STATE ────────────────────────────────────────
 const S={
@@ -310,6 +311,35 @@ async function loadAll(){
     safeFetch('/api/stats',        {byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0}),
   ]);
   Object.assign(S, {bus,delivery,mesures,cdd,emplacements,cpm,users,stats});
+  // Appliquer les restrictions par profil
+  applyProfileFilter();
+}
+
+function applyProfileFilter(){
+  const profil = S.currentUser?.profil;
+  if(profil !== 'CDP') return; // Seul CDP a une restriction de données pour l'instant
+  
+  // Le CDP ne voit que les BUS dont il est le RR
+  const userName = (S.currentUser.prenom + ' ' + S.currentUser.nom).toLowerCase().trim();
+  const visibleTopos = new Set(
+    S.bus
+      .filter(b => (b.rr||'').toLowerCase().includes(userName) || userName.split(' ').some(part => part.length > 2 && (b.rr||'').toLowerCase().includes(part)))
+      .map(b => b.id)
+  );
+  
+  if(visibleTopos.size === 0) {
+    // Aucun BUS assigné — on affiche quand même pour éviter une page vide, mais on prévient
+    console.warn('CDP sans BUS assignés:', userName);
+    return;
+  }
+  
+  // Filtrer tous les modules
+  S.bus          = S.bus.filter(b => visibleTopos.has(b.id));
+  S.delivery     = S.delivery.filter(d => visibleTopos.has(d.topo));
+  S.mesures      = S.mesures.filter(m => visibleTopos.has(m.topo));
+  S.cdd          = S.cdd.filter(c => visibleTopos.has(c.topo));
+  S.emplacements = S.emplacements.filter(e => visibleTopos.has(e.topo));
+  S.cpm          = S.cpm.filter(c => visibleTopos.has(c.topo));
 }
 
 // ── HELPERS ──────────────────────────────────────
@@ -346,6 +376,12 @@ function showLogin(){
   const emailEl = document.getElementById('loginEmail');
   const passEl  = document.getElementById('loginPassword');
   const errEl   = document.getElementById('loginError');
+  // Reset état du bouton (peut être disabled après une connexion précédente)
+  btn.textContent = 'Se connecter';
+  btn.disabled = false;
+  errEl.style.display = 'none';
+  emailEl.value = '';
+  passEl.value = '';
 
   async function doLogin(){
     const email    = emailEl.value.trim();
@@ -442,7 +478,7 @@ function openBusForm(bus) {
           <input id="bf_av" type="number" min="0" max="100" value="${bus?.av??0}" style="width:100%">
         </div>
         <div>
-          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">RR</div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500">RR / CDP</div>
           <input id="bf_rr" placeholder="NOM Prénom" value="${esc(bus?.rr||'')}" style="width:100%">
         </div>
         <div>
@@ -784,7 +820,7 @@ function bindFilterEvents(){
 }
 
 function renderSidebar(){
-  const grps=[...new Set(NAV.map(n=>n.g))];
+  const grps=[...new Set(getNav().map(n=>n.g))];
   const cu=S.currentUser;
   const pc=PROFILE_COLORS[cu?.profil]||{bg:'var(--al)',c:'var(--acc)'};
 
@@ -817,7 +853,7 @@ function renderSidebar(){
 
   grps.forEach(g=>{
     h+=`<div class="sb-grp">${g}</div>`;
-    NAV.filter(n=>n.g===g).forEach(n=>{ h+=`<button class="sb-btn${S.page===n.id?' active':''}" data-page="${n.id}">${n.i} ${n.l}</button>`; });
+    getNav().filter(n=>n.g===g).forEach(n=>{ h+=`<button class="sb-btn${S.page===n.id?' active':''}" data-page="${n.id}">${n.i} ${n.l}</button>`; });
   });
 
   h+=`</div><div class="sb-foot">
@@ -1162,7 +1198,7 @@ function pageBUS(){
     <div class="tbl-wrap">
       <div style="overflow-x:auto"><table>
         <thead><tr>
-          ${[['id','Topologie'],['lot','Lot'],['dor','DOR'],['ext','Extrémités'],['etat','État'],['av','Avancement'],['rr','RR'],['liv','Livraison'],['risque','Risque']].map(([k,l])=>`<th data-sort="${k}" style="color:${S.sk===k?'var(--acc)':'var(--sub)'}">${l}${st(k)}</th>`).join('')}
+          ${[['id','Topologie'],['lot','Lot'],['dor','DOR'],['ext','Extrémités'],['etat','État'],['av','Avancement'],['rr','RR / CDP'],['liv','Livraison'],['risque','Risque']].map(([k,l])=>`<th data-sort="${k}" style="color:${S.sk===k?'var(--acc)':'var(--sub)'}">${l}${st(k)}</th>`).join('')}
           <th style="width:90px;text-align:center;color:var(--sub)">Actions</th>
         </tr></thead>
         <tbody>
@@ -1621,6 +1657,10 @@ function pageCPM(){
     {type:'select',key:'statut',label:'Tous statuts',options:['Non reçu','CRMAD reçu','En vérification','Validé','Bloqué']},
   ],'fCpm');
   const totalRows = [...new Set([...S.bus.map(b=>b.id),...S.cpm.map(c=>c.topo)])].length;
+  // Warning for CDP with no assigned BUS
+  const cdpWarning = S.currentUser?.profil==='CDP' && S.bus.length===0
+    ? '<div style="padding:14px 18px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;margin-bottom:14px;font-size:13px;color:#92400e">⚠️ Aucun BUS ne vous est assigné en tant que RR. Vérifiez que votre nom est bien renseigné dans le champ RR des BUS vous concernant.</div>'
+    : '';
   return [
     '<div class="page">',
     '<div class="page-hdr">',
