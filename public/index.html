@@ -141,9 +141,48 @@ select option{background:var(--card)}
 .notif{position:fixed;bottom:24px;right:24px;padding:13px 20px;border-radius:11px;font-size:14px;font-weight:500;box-shadow:var(--sh-md);z-index:9999;animation:slideIn .2s ease}
 @keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
 .history-item{padding:10px 0;border-bottom:1px solid var(--brd);font-size:14px}
+
+/* ── LOGIN PAGE ── */
+#login-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:2000;align-items:center;justify-content:center}
+#login-screen.visible{display:flex}
+.login-box{background:var(--card);border:1px solid var(--brd);border-radius:18px;padding:40px 44px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.12)}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;justify-content:center}
+.login-logo-icon{width:42px;height:42px;border-radius:12px;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:20px}
+.login-field{margin-bottom:16px}
+.login-field label{display:block;font-size:13px;font-weight:500;color:var(--sub);margin-bottom:6px}
+.login-field input{width:100%;font-size:15px;padding:11px 14px}
+.login-btn{width:100%;padding:12px;font-size:15px;font-weight:600;border-radius:10px;border:none;background:var(--acc);color:#fff;cursor:pointer;transition:opacity .15s;margin-top:4px}
+.login-btn:hover{opacity:.9}
+.login-btn:active{opacity:.8}
+.login-error{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:9px;padding:10px 14px;color:#ef4444;font-size:13px;margin-bottom:16px;display:none}
 </style>
 </head>
 <body>
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon">⚡</div>
+      <div>
+        <div style="font-size:22px;font-weight:700;color:var(--text)">NetCollect</div>
+        <div style="font-size:12px;color:var(--mut)">Réseau BUS / Orange</div>
+      </div>
+    </div>
+    <div id="loginError" class="login-error"></div>
+    <div class="login-field">
+      <label for="loginEmail">Adresse mail</label>
+      <input id="loginEmail" type="email" placeholder="prenom.nom@entreprise.fr" autocomplete="email">
+    </div>
+    <div class="login-field">
+      <label for="loginPassword">Mot de passe</label>
+      <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="loginBtn">Se connecter</button>
+    <div style="margin-top:20px;padding:12px 14px;background:var(--th);border-radius:9px;border:1px solid var(--brd)">
+      <div style="font-size:12px;color:var(--sub);font-weight:600;margin-bottom:4px">Compte par défaut :</div>
+      <div style="font-size:12px;color:var(--mut)">admin@netcollect.fr · <strong>Admin123!</strong></div>
+    </div>
+  </div>
+</div>
 <div id="sidebar"></div>
 <div id="main"><div class="page" style="display:flex;align-items:center;justify-content:center;height:100%"><div class="spinner"></div> Chargement...</div></div>
 <div id="mo-overlay"></div>
@@ -168,32 +207,33 @@ const S={
 
 // ── API ──────────────────────────────────────────
 const api = {
-  async get(url){ const r=await fetch(url); if(!r.ok) throw new Error(await r.text()); return r.json(); },
-  async put(url,data){ const r=await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
-  async post(url,data){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
-  async upload(url,formData){ const r=await fetch(url,{method:'POST',body:formData}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async get(url){ const r=await fetch(url,{credentials:'include'}); if(r.status===401){showLogin();throw new Error('Non authentifié');} if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async put(url,data){ const r=await fetch(url,{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); if(r.status===401){showLogin();throw new Error('Non authentifié');} if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async post(url,data){ const r=await fetch(url,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); if(r.status===401){showLogin();throw new Error('Non authentifié');} if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async upload(url,formData){ const r=await fetch(url,{method:'POST',credentials:'include',body:formData}); if(r.status===401){showLogin();throw new Error('Non authentifié');} if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  async delete(url){ const r=await fetch(url,{method:'DELETE',credentials:'include'}); if(r.status===401){showLogin();throw new Error('Non authentifié');} if(!r.ok) throw new Error(await r.text()); return r.json(); },
 };
 
 async function loadAll(){
-  // Chaque endpoint est chargé indépendamment — une erreur n'en bloque pas d'autres
   async function safeFetch(url, fallback){
     try {
-      const r = await fetch(url);
+      const r = await fetch(url, {credentials:'include'});
+      if(r.status===401){ showLogin(); return fallback; }
       if(!r.ok) return fallback;
       const ct = r.headers.get('content-type')||'';
-      if(!ct.includes('json')) return fallback; // évite de parser du HTML en JSON
+      if(!ct.includes('json')) return fallback;
       return await r.json();
     } catch(e){ return fallback; }
   }
   const [bus,delivery,mesures,cdd,emplacements,cpm,users,stats] = await Promise.all([
-    safeFetch('/api/bus',      []),
-    safeFetch('/api/delivery', []),
-    safeFetch('/api/mesures',  []),
-    safeFetch('/api/cdd',      []),
+    safeFetch('/api/bus',          []),
+    safeFetch('/api/delivery',     []),
+    safeFetch('/api/mesures',      []),
+    safeFetch('/api/cdd',          []),
     safeFetch('/api/emplacements', []),
-    safeFetch('/api/cpm',      []),
-    safeFetch('/api/users',    []),
-    safeFetch('/api/stats',    {byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0}),
+    safeFetch('/api/cpm',          []),
+    safeFetch('/api/users',        []),
+    safeFetch('/api/stats',        {byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0}),
   ]);
   Object.assign(S, {bus,delivery,mesures,cdd,emplacements,cpm,users,stats});
 }
@@ -220,6 +260,57 @@ function notify(msg, type='success'){
 function destroyCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy();}catch(e){}});S.charts={};}
 
 // ── SIDEBAR ──────────────────────────────────────
+
+// ═══════════════════════════════════════════════
+// AUTH FUNCTIONS
+// ═══════════════════════════════════════════════
+function showLogin(){
+  document.getElementById('login-screen').classList.add('visible');
+  document.getElementById('app') && (document.getElementById('app').style.display='none');
+  // Bind events
+  const btn = document.getElementById('loginBtn');
+  const emailEl = document.getElementById('loginEmail');
+  const passEl  = document.getElementById('loginPassword');
+  const errEl   = document.getElementById('loginError');
+
+  async function doLogin(){
+    const email    = emailEl.value.trim();
+    const password = passEl.value;
+    if(!email||!password){ errEl.textContent='Veuillez remplir tous les champs'; errEl.style.display=''; return; }
+    btn.textContent='Connexion...'; btn.disabled=true;
+    errEl.style.display='none';
+    try{
+      const r = await fetch('/api/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+      const data = await r.json();
+      if(!r.ok){ errEl.textContent=data.error||'Erreur de connexion'; errEl.style.display=''; btn.textContent='Se connecter'; btn.disabled=false; return; }
+      // Connexion réussie
+      S.currentUser = data.user;
+      S.userName    = data.user.prenom+' '+data.user.nom;
+      document.getElementById('login-screen').classList.remove('visible');
+      await loadAll();
+      renderSidebar();
+      renderMain();
+    }catch(e){
+      errEl.textContent='Erreur serveur: '+e.message; errEl.style.display='';
+      btn.textContent='Se connecter'; btn.disabled=false;
+    }
+  }
+
+  btn.onclick = doLogin;
+  passEl.onkeydown = e => { if(e.key==='Enter') doLogin(); };
+  emailEl.onkeydown = e => { if(e.key==='Enter') passEl.focus(); };
+  setTimeout(()=>emailEl.focus(), 100);
+}
+
+async function doLogout(){
+  try{ await fetch('/api/auth/logout',{method:'POST',credentials:'include'}); }catch(e){}
+  S.currentUser=null; S.userName='';
+  // Reset state
+  Object.assign(S,{bus:[],delivery:[],mesures:[],cdd:[],emplacements:[],cpm:[],users:[],
+    stats:{byEtat:[],byLot:[],avGlobal:0,cfCount:0,nokCount:0,sin3Nok:0,riskHigh:0}});
+  showLogin();
+}
+
 function renderSidebar(){
   const grps=[...new Set(NAV.map(n=>n.g))];
   const cu=S.currentUser;
@@ -258,7 +349,8 @@ function renderSidebar(){
   });
 
   h+=`</div><div class="sb-foot">
-    <button class="btn sm" id="themeBtn" style="width:100%;justify-content:center">${S.dark?'☀ Mode clair':'🌙 Mode sombre'}</button>
+    <button class="btn sm" id="themeBtn" style="width:100%;justify-content:center;margin-bottom:6px">${S.dark?'☀ Mode clair':'🌙 Mode sombre'}</button>
+    <button class="btn sm" id="logoutBtn" style="width:100%;justify-content:center;color:#ef4444;border-color:rgba(239,68,68,.3)">⎋ Déconnexion</button>
   </div>`;
 
   document.getElementById('sidebar').innerHTML=h;
@@ -794,12 +886,17 @@ function pageUsers(){
             <div style="font-size:11px;color:var(--sub);margin-bottom:5px;font-weight:500">Adresse mail <span style="color:#ef4444">*</span></div>
             <input id="uf_email" type="email" placeholder="jean.dupont@entreprise.fr" style="width:100%" autocomplete="off">
           </div>
-          <div style="margin-bottom:20px">
+          <div style="margin-bottom:14px">
             <div style="font-size:11px;color:var(--sub);margin-bottom:5px;font-weight:500">Profil <span style="color:#ef4444">*</span></div>
             <select id="uf_profil" style="width:100%">
               <option value="">-- Sélectionner un profil --</option>
               ${PROFILES.map(p=>`<option value="${p}">${p}</option>`).join('')}
             </select>
+          </div>
+          <div style="margin-bottom:20px">
+            <div style="font-size:11px;color:var(--sub);margin-bottom:5px;font-weight:500">Mot de passe <span id="uf_pwd_hint" style="font-weight:400;color:var(--mut)">(laisser vide pour garder l'actuel)</span></div>
+            <input id="uf_password" type="password" placeholder="Nouveau mot de passe..." style="width:100%" autocomplete="new-password">
+            <div id="uf_pwd_default" style="font-size:11px;color:var(--mut);margin-top:4px;display:none">Mot de passe par défaut : <strong>Temp1234!</strong></div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn" id="cancelUserForm">Annuler</button>
@@ -828,8 +925,8 @@ function bindUsersEvents(){
     const name=el.dataset.userName;
     if(!confirm(`Supprimer l'utilisateur "${name}" ?`)) return;
     try{
-      const r=await fetch('/api/users/'+el.dataset.delUser,{method:'DELETE'});
-      if(!r.ok){const e=await r.json();return notify(e.error||'Erreur','error');}
+      const rd=await fetch('/api/users/'+el.dataset.delUser,{method:'DELETE',credentials:'include'});
+      if(!rd.ok){const e=await rd.json();return notify(e.error||'Erreur','error');}
       notify('Utilisateur supprimé');
       await loadAll(); renderMain();
     }catch(e){notify('Erreur: '+e.message,'error');}
@@ -840,10 +937,15 @@ function openUserForm(user){
   const overlay=document.getElementById('userFormOverlay');
   if(!overlay) return;
   document.getElementById('userFormTitle').textContent=user?'Modifier l\'utilisateur':'Nouvel utilisateur';
-  document.getElementById('uf_nom').value    = user?user.nom:'';
-  document.getElementById('uf_prenom').value = user?user.prenom:'';
-  document.getElementById('uf_email').value  = user?user.email:'';
-  document.getElementById('uf_profil').value = user?user.profil:'';
+  document.getElementById('uf_nom').value      = user?user.nom:'';
+  document.getElementById('uf_prenom').value   = user?user.prenom:'';
+  document.getElementById('uf_email').value    = user?user.email:'';
+  document.getElementById('uf_profil').value   = user?user.profil:'';
+  document.getElementById('uf_password').value = '';
+  const hintEl = document.getElementById('uf_pwd_hint');
+  const defEl  = document.getElementById('uf_pwd_default');
+  if(hintEl) hintEl.style.display = user?'':'none';
+  if(defEl)  defEl.style.display  = user?'none':'';
   document.getElementById('userFormError').style.display='none';
   overlay.style.display='flex';
   overlay._editId = user?user.id:null;
@@ -874,7 +976,7 @@ function openUserForm(user){
       const isEdit=!!overlay._editId;
       const url = isEdit?'/api/users/'+overlay._editId:'/api/users';
       const method = isEdit?'PUT':'POST';
-      const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,prenom,email,profil})});
+      const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({nom,prenom,email,profil,...(document.getElementById('uf_password')?.value?.trim()?{password:document.getElementById('uf_password').value.trim()}:{})})});
       const data=await r.json();
       if(!r.ok){errEl.textContent=data.error||'Erreur serveur';errEl.style.display='';return;}
       overlay.style.display='none';
@@ -1266,6 +1368,8 @@ function bindPageEvents(){
   // User picker
   document.getElementById('switchUserBtn')?.addEventListener('click', openUserPicker);
   document.getElementById('loginPrompt')?.addEventListener('click', openUserPicker);
+  const logoutBtn=document.getElementById('logoutBtn');
+  if(logoutBtn) logoutBtn.addEventListener('click',()=>{if(confirm('Se déconnecter ?')) doLogout();});
   const tb=document.getElementById('themeBtn');
   if(tb) tb.addEventListener('click',()=>{S.dark=!S.dark;document.body.classList.toggle('dk',S.dark);localStorage.setItem('nc_dark',S.dark?'1':'');renderSidebar();renderMain();});
 
@@ -1382,13 +1486,15 @@ document.getElementById('mo-overlay').addEventListener('click',async e=>{
 // ── INIT ─────────────────────────────────────────
 (async()=>{
   if(localStorage.getItem('nc_dark')==='1'){S.dark=true;document.body.classList.add('dk');}
+  // Vérifier si l'utilisateur est authentifié
+  try {
+    const r = await fetch('/api/auth/me', {credentials:'include'});
+    const data = await r.json();
+    if (!data.authenticated) { showLogin(); return; }
+    S.currentUser = data.user;
+    S.userName = data.user.prenom + ' ' + data.user.nom;
+  } catch(e) { showLogin(); return; }
   await loadAll();
-  // Restaurer l'utilisateur depuis localStorage
-  const savedUserId = localStorage.getItem('nc_user_id');
-  if(savedUserId && S.users.length){
-    const u=S.users.find(x=>String(x.id)===savedUserId);
-    if(u){ S.currentUser=u; S.userName=u.prenom+' '+u.nom; }
-  }
   renderSidebar();
   renderMain();
 })();
