@@ -174,18 +174,18 @@ async function initUsers() {
     if (rows[0].n === 0) {
       await pool.query(
         'INSERT INTO users(nom,prenom,email,profil,password_hash) VALUES($1,$2,$3,$4,$5) ON CONFLICT(email) DO NOTHING',
-        ['Admin','NetCollect','admin@netcollect.fr','Admin',defaultHash]
+        ['Admin','TransProd','admin@TransProd.fr','Admin',defaultHash]
       );
-      console.log('👤 Admin créé : admin@netcollect.fr / Admin123!');
+      console.log('👤 Admin créé : admin@TransProd.fr / Admin123!');
     }
     // Mettre un hash par défaut aux utilisateurs sans mot de passe
     await pool.query(`UPDATE users SET password_hash=$1 WHERE password_hash IS NULL OR password_hash=''`,[defaultHash]);
   } else {
     const users = loadJ('users');
     if (users.length === 0) {
-      saveJ('users', [{id:1,nom:'Admin',prenom:'NetCollect',email:'admin@netcollect.fr',
+      saveJ('users', [{id:1,nom:'Admin',prenom:'TransProd',email:'admin@TransProd.fr',
         profil:'Admin',password_hash:defaultHash,actif:true,created_at:now(),updated_at:now()}]);
-      console.log('👤 Admin créé : admin@netcollect.fr / Admin123!');
+      console.log('👤 Admin créé : admin@TransProd.fr / Admin123!');
     } else {
       let changed = false;
       users.forEach(u => { if (!u.password_hash) { u.password_hash = defaultHash; changed = true; } });
@@ -633,7 +633,7 @@ app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')))
 
 // ── START ─────────────────────────────────────────
 app.listen(PORT,'0.0.0.0',async()=>{
-  console.log(`\n✅  NetCollect → http://localhost:${PORT}`);
+  console.log(`\n✅  TransProd → http://localhost:${PORT}`);
   console.log(`📊  Stockage   → ${USE_PG?'PostgreSQL':'JSON'}`);
   if(USE_PG){
     await initDB().catch(e=>console.error('DB init error:',e));
