@@ -822,6 +822,128 @@ app.get('/api/export', requireAuth, async (req,res) => {
     res.send(buf);
   } catch(e){console.error('Export error:',e);res.status(500).json({error:e.message});}
 });
+
+// ═══════════════════════════════════════════════
+// BOT ASSISTANT — Groq API
+// ═══════════════════════════════════════════════
+app.post('/api/chat', requireAuth, async (req, res) => {
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+  if (!GROQ_API_KEY) return res.status(503).json({ error: 'GROQ_API_KEY non configurée dans les variables Railway.' });
+
+  try {
+    const { message, history = [] } = req.body;
+    if (!message?.trim()) return res.status(400).json({ error: 'Message vide' });
+
+    // Récupérer les stats en temps réel pour le contexte
+    let stats = {}, busCount = 0, byLot = [], byEtat = [], riskHigh = 0, nokCount = 0;
+    try {
+      if (USE_PG) {
+        const [s1,s2,s3,s4,s5] = await Promise.all([
+          pool.query('SELECT COUNT(*)::int as n FROM bus'),
+          pool.query('SELECT lot, COUNT(*)::int as total, SUM(CASE WHEN etat=4 THEN 1 ELSE 0 END)::int as trx, SUM(CASE WHEN etat>=5 THEN 1 ELSE 0 END)::int as livres, ROUND(AVG(av))::int as av_moy FROM bus GROUP BY lot ORDER BY lot'),
+          pool.query('SELECT etat, COUNT(*)::int as count FROM bus GROUP BY etat'),
+          pool.query("SELECT COUNT(*)::int as n FROM bus WHERE risque='Élevé'"),
+          pool.query('SELECT COALESCE(SUM(nok),0)::int as n FROM mesures'),
+        ]);
+        busCount  = s1.rows[0]?.n || 0;
+        byLot     = s2.rows;
+        byEtat    = s3.rows;
+        riskHigh  = s4.rows[0]?.n || 0;
+        nokCount  = s5.rows[0]?.n || 0;
+      } else {
+        const bus = loadJ('bus');
+        busCount  = bus.length;
+        byLot     = [...new Set(bus.map(b=>b.lot).filter(Boolean))].map(lot => {
+          const lb = bus.filter(b=>b.lot===lot);
+          return { lot, total:lb.length, trx:lb.filter(b=>b.etat===4).length, livres:lb.filter(b=>b.etat>=5).length, av_moy:Math.round(lb.reduce((a,b)=>a+b.av,0)/Math.max(1,lb.length)) };
+        });
+        byEtat    = [0,1,2,3,4,5,6].map(e=>({etat:e,count:bus.filter(b=>b.etat===e).length})).filter(r=>r.count>0);
+        riskHigh  = bus.filter(b=>b.risque==='Élevé').length;
+        nokCount  = loadJ('mesures').reduce((a,m)=>a+(m.nok||0),0);
+      }
+    } catch(e) { console.error('Stats for bot:', e.message); }
+
+    const etatsNoms = {0:'Non démarré',1:'Design',2:'Delivery',3:'Éd. Plans',4:'Travaux',5:'Livré',6:'MES'};
+    const etatsSummary = byEtat.map(r=>`${etatsNoms[r.etat]||r.etat}: ${r.count}`).join(', ');
+    const lotsSummary  = byLot.map(l=>`${l.lot} (${l.total} BUS, ${l.trx} travaux, ${l.livres} livrés, av. moy. ${l.av_moy}%)`).join(' | ');
+
+    const systemPrompt = `Tu es l'assistant IA intégré à TransProd, un outil de suivi opérationnel du réseau BUS / Orange (déploiement fibre optique).
+
+DONNÉES EN TEMPS RÉEL (${new Date().toLocaleDateString('fr-FR')}) :
+- Total BUS : ${busCount}
+- Par état : ${etatsSummary}
+- Par lot : ${lotsSummary}
+- BUS à risque élevé : ${riskHigh}
+- Mesures NOK : ${nokCount}
+
+GLOSSAIRE MÉTIER :
+- BUS / Topologie : segment du réseau fibre optique identifié par un nom (ex: 38_73_BUS_3001)
+- Lot : regroupement de BUS par contrat (LOT1, LOT2, LOT3)
+- RR : Responsable Réseau, personne en charge du suivi terrain
+- HEPOC : document technique Orange décrivant les équipements à livrer
+- CPM : Commande de Prestation de Mise en service
+- CRMAD : Compte-Rendu de Mise à Disposition — confirme la disponibilité du réseau
+- MAD Orange : Mise à Disposition par Orange
+- CDD : Commande de Déploiement COL pour chaque site
+- PFTO : Plate-Forme de Traitement des Ordres
+- SIN3 : Système d'Information réseau de Free — à mettre à jour après livraison
+- MES : Mise en Service — activation commerciale du BUS
+- DOR : Direction Opérationnelle Régionale Orange
+
+ÉTATS BUS (dans l'ordre) :
+0-Non démarré → 1-Design → 2-Delivery → 3-Éd. Plans → 4-Travaux → 5-Livré → 6-MES
+
+MODULES DE L'APPLICATION :
+- Dashboard Prod : vue opérationnelle quotidienne (alertes, actions requises)
+- Dashboard KPI : vue management (taux livraison, MES, avancement)
+- BUS/Topologies : liste complète des BUS avec filtres, CRUD
+- Delivery : suivi HEPOC/CPM/commandes fermes
+- Travaux : suivi des chantiers (tableau + kanban)
+- Mesures : tronçons OK/NOK par topologie
+- CDD : commandes COL, PFTO, SIN3
+- Emplacements : annexes B/C, RDV, installation, Consuel
+- CPM/CRMAD : import et suivi des fichiers CRMAD Orange
+
+INSTRUCTIONS :
+- Réponds en français, de façon concise et directe
+- Utilise les données en temps réel pour répondre aux questions sur l'état du projet
+- Si tu ne sais pas quelque chose, dis-le clairement
+- Pour les questions hors contexte (non liées au projet réseau), réponds brièvement que tu es spécialisé sur TransProd
+- Formate tes réponses avec des listes ou tableaux quand c'est pertinent`;
+
+    // Construire l'historique (max 10 derniers messages)
+    const messages = history.slice(-10).concat([{ role: 'user', content: message.trim() }]);
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + GROQ_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        temperature: 0.4,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Groq error:', err);
+      return res.status(502).json({ error: 'Erreur API Groq: ' + response.status });
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || 'Pas de réponse';
+    res.json({ reply, model: data.model });
+
+  } catch(e) {
+    console.error('Chat error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── SETUP & HEALTH ────────────────────────────────
 app.get('/api/setup', async (req,res) => {
   if (!USE_PG) return res.json({status:'ok',mode:'json',message:'Mode JSON, pas de setup requis'});
