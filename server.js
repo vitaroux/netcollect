@@ -610,6 +610,216 @@ app.post('/api/import/cpm', requireAuth, upload.single('file'), async (req,res) 
   } catch(e){console.error('CPM import error:',e);res.status(500).json({error:e.message});}
 });
 
+
+// ═══════════════════════════════════════════════
+// BUS : CREATE + DELETE
+// ═══════════════════════════════════════════════
+app.post('/api/bus', requireAuth, async (req,res) => {
+  try {
+    const b = req.body;
+    if (!b.id?.trim()) return res.status(400).json({error:'Le nom de topologie est obligatoire'});
+    if (!b.lot?.trim()) return res.status(400).json({error:'Le lot est obligatoire'});
+    if (USE_PG) {
+      try {
+        const {rows} = await pool.query(
+          `INSERT INTO bus(id,lot,dor,ext,etat,rr,av,liv,mes,risque,comment)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+          [b.id.trim(),b.lot.trim(),b.dor||'',b.ext||'',b.etat??0,b.rr||'',b.av??0,b.liv||'',b.mes||'',b.risque||'Faible',b.comment||'']
+        );
+        return res.status(201).json(rows[0]);
+      } catch(e) {
+        if(e.code==='23505') return res.status(400).json({error:'Cette topologie existe déjà'});
+        throw e;
+      }
+    }
+    const db=loadJ('bus');
+    if(db.find(x=>x.id===b.id.trim())) return res.status(400).json({error:'Cette topologie existe déjà'});
+    const row={id:b.id.trim(),lot:b.lot.trim(),dor:b.dor||'',ext:b.ext||'',etat:b.etat??0,rr:b.rr||'',av:b.av??0,liv:b.liv||'',mes:b.mes||'',risque:b.risque||'Faible',comment:b.comment||'',created_at:now(),updated_at:now()};
+    db.push(row); saveJ('bus',db); res.status(201).json(row);
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+app.delete('/api/bus/:id', requireAuth, async (req,res) => {
+  try {
+    if(USE_PG){
+      await pool.query('DELETE FROM delivery WHERE topo=$1',[req.params.id]);
+      await pool.query('DELETE FROM mesures WHERE topo=$1',[req.params.id]);
+      await pool.query('DELETE FROM cdd WHERE topo=$1',[req.params.id]);
+      await pool.query('DELETE FROM emplacements WHERE topo=$1',[req.params.id]);
+      await pool.query('DELETE FROM cpm WHERE topo=$1',[req.params.id]);
+      const {rows}=await pool.query('DELETE FROM bus WHERE id=$1 RETURNING id',[req.params.id]);
+      if(!rows[0]) return res.status(404).json({error:'BUS introuvable'});
+      return res.json({ok:true});
+    }
+    ['delivery','mesures','cdd','emplacements','cpm'].forEach(t=>{const d=loadJ(t).filter(x=>x.topo!==req.params.id);saveJ(t,d);});
+    const db=loadJ('bus'); const idx=db.findIndex(b=>b.id===req.params.id);
+    if(idx<0) return res.status(404).json({error:'BUS introuvable'});
+    db.splice(idx,1); saveJ('bus',db); res.json({ok:true});
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+// ═══════════════════════════════════════════════
+// DELIVERY : CREATE
+// ═══════════════════════════════════════════════
+app.post('/api/delivery', requireAuth, async (req,res) => {
+  try {
+    const f=req.body;
+    if(!f.topo?.trim()) return res.status(400).json({error:'Topologie obligatoire'});
+    if(USE_PG){
+      await pool.query(`INSERT INTO delivery(topo,lot,etat,h_rcv,h_f,h_rnv,c_rcv,c_f,c_rnv,v_o,cf)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(topo) DO UPDATE SET
+        lot=$2,etat=$3,h_rcv=$4,h_f=$5,h_rnv=$6,c_rcv=$7,c_f=$8,c_rnv=$9,v_o=$10,cf=$11,updated_at=NOW()`,
+        [f.topo,f.lot||'',f.etat||'',f.hRcv||'NON',f.hF||'NON',f.hRnv||'NON',f.cRcv||'NON',f.cF||'NON',f.cRnv||'NON',f.vO||'NON',f.cf||'NON']);
+      return res.status(201).json({ok:true});
+    }
+    const db=loadJ('delivery'); const idx=db.findIndex(d=>d.topo===f.topo);
+    const row={topo:f.topo,lot:f.lot||'',etat:f.etat||'',hRcv:f.hRcv||'NON',hF:f.hF||'NON',hRnv:f.hRnv||'NON',cRcv:f.cRcv||'NON',cF:f.cF||'NON',cRnv:f.cRnv||'NON',vO:f.vO||'NON',cf:f.cf||'NON',updated_at:now()};
+    if(idx>=0)db[idx]=row;else db.push(row); saveJ('delivery',db); res.status(201).json(row);
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+// ═══════════════════════════════════════════════
+// MESURES : CREATE + DELETE
+// ═══════════════════════════════════════════════
+app.post('/api/mesures', requireAuth, async (req,res) => {
+  try {
+    const f=req.body;
+    if(!f.topo?.trim()) return res.status(400).json({error:'Topologie obligatoire'});
+    if(USE_PG){
+      const {rows}=await pool.query('INSERT INTO mesures(topo,rr,nb_t,moe,nb_m,ok,nok) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+        [f.topo,f.rr||'',f.nbT||0,f.moe||'Nok',f.nbM||0,f.ok||0,f.nok||0]);
+      return res.status(201).json({...rows[0],nbT:rows[0].nb_t,nbM:rows[0].nb_m});
+    }
+    const db=loadJ('mesures'); const id=Date.now();
+    const row={id,topo:f.topo,rr:f.rr||'',nbT:f.nbT||0,moe:f.moe||'Nok',nbM:f.nbM||0,ok:f.ok||0,nok:f.nok||0,updated_at:now()};
+    db.push(row); saveJ('mesures',db); res.status(201).json(row);
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+app.delete('/api/mesures/:id', requireAuth, async (req,res) => {
+  try {
+    if(USE_PG){const {rows}=await pool.query('DELETE FROM mesures WHERE id=$1 RETURNING id',[req.params.id]);if(!rows[0])return res.status(404).json({error:'Mesure introuvable'});return res.json({ok:true});}
+    const db=loadJ('mesures');const idx=db.findIndex(m=>m.id===+req.params.id);
+    if(idx<0)return res.status(404).json({error:'Mesure introuvable'});
+    db.splice(idx,1);saveJ('mesures',db);res.json({ok:true});
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+// ═══════════════════════════════════════════════
+// CDD : CREATE + DELETE
+// ═══════════════════════════════════════════════
+app.post('/api/cdd', requireAuth, async (req,res) => {
+  try {
+    const f=req.body;
+    if(!f.topo?.trim()) return res.status(400).json({error:'Topologie obligatoire'});
+    if(USE_PG){
+      const {rows}=await pool.query('INSERT INTO cdd(lot,topo,dept,rr,sc,ns,mad,cmd,pfto,sin3,comment) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *',
+        [f.lot||'',f.topo,f.dept||'',f.rr||'',f.sc||'',f.ns||'',f.mad||'',f.cmd||'',f.pfto||'NON',f.sin3||'NON',f.comment||'']);
+      return res.status(201).json(rows[0]);
+    }
+    const db=loadJ('cdd'); const id=Date.now();
+    const row={id,lot:f.lot||'',topo:f.topo,dept:f.dept||'',rr:f.rr||'',sc:f.sc||'',ns:f.ns||'',mad:f.mad||'',cmd:f.cmd||'',pfto:f.pfto||'NON',sin3:f.sin3||'NON',comment:f.comment||'',updated_at:now()};
+    db.push(row);saveJ('cdd',db);res.status(201).json(row);
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+app.delete('/api/cdd/:id', requireAuth, async (req,res) => {
+  try {
+    if(USE_PG){const {rows}=await pool.query('DELETE FROM cdd WHERE id=$1 RETURNING id',[req.params.id]);if(!rows[0])return res.status(404).json({error:'CDD introuvable'});return res.json({ok:true});}
+    const db=loadJ('cdd');const idx=db.findIndex(c=>c.id===+req.params.id);
+    if(idx<0)return res.status(404).json({error:'CDD introuvable'});
+    db.splice(idx,1);saveJ('cdd',db);res.json({ok:true});
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+// ═══════════════════════════════════════════════
+// EMPLACEMENTS : CREATE + PUT + DELETE
+// ═══════════════════════════════════════════════
+app.post('/api/emplacements', requireAuth, async (req,res) => {
+  try {
+    const f=req.body;
+    if(!f.topo?.trim()) return res.status(400).json({error:'Topologie obligatoire'});
+    if(USE_PG){
+      const {rows}=await pool.query('INSERT INTO emplacements(topo,lot,site,dept,rr,ep,rdv,a_b,inst,cons,a_c) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *',
+        [f.topo,f.lot||'',f.site||'',f.dept||'',f.rr||'',f.ep||'NON',f.rdv||'NON',f.aB||'NON',f.inst||'NON',f.cons||'NON',f.aC||'NON']);
+      return res.status(201).json({...rows[0],aB:rows[0].a_b,aC:rows[0].a_c});
+    }
+    const db=loadJ('emplacements');const id=Date.now();
+    const row={id,topo:f.topo,lot:f.lot||'',site:f.site||'',dept:f.dept||'',rr:f.rr||'',ep:f.ep||'NON',rdv:f.rdv||'NON',aB:f.aB||'NON',inst:f.inst||'NON',cons:f.cons||'NON',aC:f.aC||'NON',updated_at:now()};
+    db.push(row);saveJ('emplacements',db);res.status(201).json(row);
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+app.delete('/api/emplacements/:id', requireAuth, async (req,res) => {
+  try {
+    if(USE_PG){const {rows}=await pool.query('DELETE FROM emplacements WHERE id=$1 RETURNING id',[req.params.id]);if(!rows[0])return res.status(404).json({error:'Emplacement introuvable'});return res.json({ok:true});}
+    const db=loadJ('emplacements');const idx=db.findIndex(e=>e.id===+req.params.id);
+    if(idx<0)return res.status(404).json({error:'Emplacement introuvable'});
+    db.splice(idx,1);saveJ('emplacements',db);res.json({ok:true});
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+// ═══════════════════════════════════════════════
+// EXPORT EXCEL (génère un .xlsx depuis la base)
+// ═══════════════════════════════════════════════
+app.get('/api/export', requireAuth, async (req,res) => {
+  try {
+    let bus,delivery,mesures,cdd,emplacements;
+    if(USE_PG){
+      [bus,delivery,mesures,cdd,emplacements]=await Promise.all([
+        pool.query('SELECT * FROM bus ORDER BY lot,id').then(r=>r.rows),
+        pool.query('SELECT * FROM delivery ORDER BY lot,topo').then(r=>r.rows.map(r=>({...r,hRcv:r.h_rcv,hF:r.h_f,hRnv:r.h_rnv,cRcv:r.c_rcv,cF:r.c_f,cRnv:r.c_rnv,vO:r.v_o}))),
+        pool.query('SELECT * FROM mesures ORDER BY topo').then(r=>r.rows.map(r=>({...r,nbT:r.nb_t,nbM:r.nb_m}))),
+        pool.query('SELECT * FROM cdd ORDER BY lot,topo').then(r=>r.rows),
+        pool.query('SELECT * FROM emplacements ORDER BY lot,topo').then(r=>r.rows.map(r=>({...r,aB:r.a_b,aC:r.a_c}))),
+      ]);
+    } else {
+      bus=loadJ('bus');delivery=loadJ('delivery');mesures=loadJ('mesures');cdd=loadJ('cdd');emplacements=loadJ('emplacements');
+    }
+
+    const ETATS={0:'0 - Non démarré',1:'1 - Design',2:'2 - Delivery',3:'3 - Editions Plans',4:'4 - Travaux',5:'5 - Livré',6:'6 - MES'};
+    const wb=XLSX.utils.book_new();
+
+    // Etat BUS
+    const busRows=bus.map(b=>({'Lot':b.lot,'DOR':b.dor,'Nom topologie':b.id,'Extrémité':b.ext,'Etat BUS':ETATS[b.etat]||b.etat,'RR':b.rr,'Risque':b.risque,'Commentaire':b.comment}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(busRows),'Etat BUS');
+
+    // HME
+    const hmeRows=bus.map(b=>({'ReferenceRegroupement':b.id,'LOT':b.lot,'Etat':ETATS[b.etat],'Semaine Prév. Livraison':b.liv,'Semaine Prév. MES':b.mes}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(hmeRows),'HME');
+
+    // Suivi TRAVAUX
+    const trxRows=bus.map(b=>({'LOT':b.lot,'Typologie':b.id,'RR':b.rr,'Etat BUS':ETATS[b.etat],'Avancement BUS':b.av+'%','Date livraison':b.liv,'Points bloquants / Risques':b.risque!=='Faible'?b.risque:'','Commentaires BE':b.comment,'Commentaires RR':''}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(trxRows),'Suivi TRAVAUX');
+
+    // SUIVI DELIVERY
+    const dlvRows=delivery.map(d=>({'LOT':d.lot,'Projet':d.topo,'Etat':d.etat,'Transmis par Orange
+Date':d.hRcv,'Envoyé à Orange
+Date':d.hRnv,'Transmis par Orange
+Date_1':d.cRcv,'Envoyé à Orange
+Date_1':d.cRnv,'Commande ferme':d.cf}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(dlvRows),'SUIVI DELIVERY');
+
+    // Mesures
+    const mesRows=mesures.map(m=>({'RR':m.rr,'Topo':m.topo,'Nb Tronçons':m.nbT,'Accès Site MOE':m.moe,'Nb Tronçons Mesurés':m.nbM,'Nb tronçons Ok':m.ok,'Nb tronçons Nok':m.nok}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mesRows),'Mesures');
+
+    // CDD
+    const cddRows=cdd.map(c=>({'LOT':c.lot,'Référence topologie':c.topo,'Département':c.dept,'RR':c.rr,'Site
+Code 42C':c.sc,'Nom site':c.ns,'Date MAD Orange':c.mad,'Numèro Commande':c.cmd,'Projet PFTO lancé':c.pfto,'Info maj SIN3':c.sin3,'Commentaire Equipe PROJET':c.comment}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cddRows),'CDD');
+
+    // SUIVI EMPLACEMENT
+    const emplRows=emplacements.map(e=>({'Topo':e.topo,'Lot':e.lot,'Site':e.site,'Dept':e.dept,'RR':e.rr,'Equipe opérationelle prévenue':e.ep,'Envoi prise de RDV ':e.rdv,'Annexe B signée':e.aB,'Installation des équipements':e.inst,'Consuel':e.cons,'Annexe C':e.aC}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(emplRows),'SUIVI EMPLACEMENT');
+
+    const buf=XLSX.write(wb,{type:'buffer',bookType:'xlsx'});
+    const date=new Date().toISOString().slice(0,10).replace(/-/g,'');
+    res.setHeader('Content-Disposition',`attachment; filename="TransProd_Export_${date}.xlsx"`);
+    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+  } catch(e){console.error('Export error:',e);res.status(500).json({error:e.message});}
+});
 // ── SETUP & HEALTH ────────────────────────────────
 app.get('/api/setup', async (req,res) => {
   if (!USE_PG) return res.json({status:'ok',mode:'json',message:'Mode JSON, pas de setup requis'});
