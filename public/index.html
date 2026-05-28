@@ -1350,65 +1350,77 @@ function openUserForm(user){
 
 // ── PAGE CPM / CRMAD ─────────────────────────────
 function pageCPM(){
-  // Fusion bus + cpm : un CPM peut exister ou non pour chaque BUS
-  const allTopos = [...new Set([...S.bus.map(b=>b.id), ...S.cpm.map(c=>c.topo)])].sort();
-  const rows = allTopos.map(id => {
-    const b = S.bus.find(x=>x.id===id) || {};
-    const c = S.cpm.find(x=>x.topo===id) || null;
-    return {id, lot:b.lot||'', rr:b.rr||'', etat:b.etat??0, cpm:c};
+  const allTopos=[...new Set([...S.bus.map(b=>b.id),...S.cpm.map(c=>c.topo)])].sort();
+  const rows=allTopos.map(id=>{
+    const b=S.bus.find(x=>x.id===id)||{};
+    const c=S.cpm.find(x=>x.topo===id)||null;
+    return {id,lot:b.lot||'',rr:b.rr||'',etat:b.etat??0,cpm:c};
   });
-  const statuts = ['Non reçu','CRMAD reçu','En vérification','Validé','Bloqué'];
+  const statuts=['Non reçu','CRMAD reçu','En vérification','Validé','Bloqué'];
   const sc={
-    'Non reçu':'rgba(100,116,139,.15):#94a3b8',
-    'CRMAD reçu':'rgba(59,130,246,.12):#93c5fd',
-    'En vérification':'rgba(234,179,8,.1):#fde68a',
-    'Validé':'rgba(34,197,94,.1):#86efac',
-    'Bloqué':'rgba(239,68,68,.1):#ef4444',
+    'Non reçu':   {bg:'rgba(100,116,139,.15)',c:'#94a3b8'},
+    'CRMAD reçu': {bg:'rgba(59,130,246,.12)', c:'#93c5fd'},
+    'En vérification':{bg:'rgba(234,179,8,.1)',c:'#fde68a'},
+    'Validé':     {bg:'rgba(34,197,94,.1)',   c:'#86efac'},
+    'Bloqué':     {bg:'rgba(239,68,68,.1)',   c:'#ef4444'},
   };
-  function sbg(s){const p=(sc[s]||'rgba(100,116,139,.15):#94a3b8').split(':');return `background:${p[0]};color:${p[1]}`;}
-  const recu=rows.filter(r=>r.cpm).length;
-  const valide=rows.filter(r=>r.cpm&&r.cpm.statut==='Validé').length;
-  const bloque=rows.filter(r=>r.cpm&&r.cpm.statut==='Bloqué').length;
-  return `<div class="page">
-    <div class="page-hdr">
-      <div><div class="page-title">CPM / CRMAD</div><div class="page-sub">Suivi des Comptes-Rendus de Mise à Disposition · ${rows.length} BUS · ${recu} CRMAD reçus</div></div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div style="font-size:11px;color:var(--sub)">Uploader un nouveau fichier CRMAD :</div>
-        <label style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--acc);background:var(--al);color:var(--acc);font-size:12px;font-weight:500;cursor:pointer">
-          📡 Importer CRMAD <input type="file" id="cpmFileInput" accept=".xlsx" style="display:none">
-        </label>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
-      ${krow('Total BUS',rows.length,'#6b7280','🔌','')}
-      ${krow('CRMAD reçus',recu,'#3b82f6','📡',rows.length?Math.round(recu/rows.length*100)+'%':'')}
-      ${krow('Validés',valide,'#10b981','✓','')}
-      ${krow('Bloqués',bloque,'#ef4444','⚠','')}
-    </div>
-    <div class="tbl-wrap"><div style="overflow-x:auto"><table>
-      <thead><tr>
-        <th>Topologie</th><th>Lot</th><th>RR</th><th>État BUS</th>
-        <th>Statut CPM</th><th>Réf. commande</th><th>Date CRMAD</th>
-        <th>Segments</th><th>Sites</th><th>FO total</th><th>Long. totale</th><th>Actions</th>
-      </tr></thead>
-      <tbody>${rows.map((r,i)=>`<tr class="${i%2?'odd':'even'}">
-        <td><span class="mono" style="color:var(--acc);font-weight:600">${esc(r.id)}</span></td>
-        <td><span class="lot-badge">${r.lot||'–'}</span></td>
-        <td style="color:var(--sub);font-size:11px">${esc(r.rr)||'–'}</td>
-        <td>${sbadge(r.etat)}</td>
-        <td>${r.cpm?`<span class="badge" style="${sbg(r.cpm.statut)}">${r.cpm.statut}</span>`:`<span class="badge" style="${sbg('Non reçu')}">Non reçu</span>`}</td>
-        <td style="font-size:11px;color:var(--sub);font-family:monospace">${r.cpm?esc(r.cpm.ref_commande).slice(0,30):'–'}</td>
-        <td style="font-size:11px;color:var(--sub)">${r.cpm?r.cpm.date_crmad:'–'}</td>
-        <td style="text-align:center;font-weight:600;color:var(--text)">${r.cpm?r.cpm.nb_segments:'–'}</td>
-        <td style="text-align:center;font-weight:600;color:var(--text)">${r.cpm?r.cpm.nb_sites:'–'}</td>
-        <td style="text-align:center;color:#3b82f6;font-weight:600">${r.cpm?r.cpm.nb_fo_total:'–'}</td>
-        <td style="text-align:center;color:var(--sub);font-size:11px">${r.cpm?Math.round(r.cpm.longueur_totale/1000)+'km':'–'}</td>
-        <td>${r.cpm?`<button class="btn sm" data-cpmtopo="${esc(r.id)}" style="color:var(--acc);border-color:var(--acc)">Détail</button>`:`<label style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:7px;border:1px solid var(--brd);color:var(--sub);font-size:11px;cursor:pointer">📡 Import<input type="file" accept=".xlsx" data-bustopo="${esc(r.id)}" class="cpmRowInput" style="display:none"></label>`}</td>
-      </tr>`).join('')}</tbody>
-    </table></div></div>
-    <div id="cpmDetail"></div>
-  </div>`;
+  function sbg(s){const x=sc[s]||sc['Non reçu'];return 'background:'+x.bg+';color:'+x.c;}
+  function cpmBadge(c2){
+    if(!c2) return '<span class="badge" style="'+sbg('Non reçu')+'">Non reçu</span>';
+    return '<span class="badge" style="'+sbg(c2.statut)+'">'+esc(c2.statut)+'</span>';
+  }
+  function actionBtn(r){
+    if(r.cpm) return '<button class="btn sm" data-cpmtopo="'+esc(r.id)+'" style="color:var(--acc);border-color:var(--acc)">&#128203; Détail</button>';
+    return '<label style="display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:7px;border:1px solid var(--brd);color:var(--sub);font-size:12px;cursor:pointer">&#128225; Importer<input type="file" accept=".xlsx" data-bustopo="'+esc(r.id)+'" class="cpmRowInput" style="display:none"></label>';
+  }
+  const recu   = rows.filter(r=>r.cpm).length;
+  const valide = rows.filter(r=>r.cpm&&r.cpm.statut==='Validé').length;
+  const bloque = rows.filter(r=>r.cpm&&r.cpm.statut==='Bloqué').length;
+  const tableRows = rows.map((r,i)=>[
+    '<tr class="'+(i%2?'odd':'even')+'">',
+    '<td><span class="mono" style="color:var(--acc);font-weight:600">'+esc(r.id)+'</span></td>',
+    '<td><span class="lot-badge">'+(r.lot||'–')+'</span></td>',
+    '<td style="color:var(--sub);font-size:12px">'+esc(r.rr||'–')+'</td>',
+    '<td>'+sbadge(r.etat)+'</td>',
+    '<td>'+cpmBadge(r.cpm)+'</td>',
+    '<td style="font-size:12px;color:var(--sub);font-family:monospace">'+(r.cpm?esc((r.cpm.ref_commande||'').slice(0,32)):'–')+'</td>',
+    '<td style="font-size:12px;color:var(--sub)">'+(r.cpm?esc(r.cpm.date_crmad||'–'):'–')+'</td>',
+    '<td style="text-align:center;font-weight:600">'+(r.cpm?r.cpm.nb_segments:'–')+'</td>',
+    '<td style="text-align:center;font-weight:600">'+(r.cpm?r.cpm.nb_sites:'–')+'</td>',
+    '<td style="text-align:center;color:#3b82f6;font-weight:600">'+(r.cpm?r.cpm.nb_fo_total:'–')+'</td>',
+    '<td style="text-align:center">'+actionBtn(r)+'</td>',
+    '</tr>',
+  ].join('')).join('');
+
+  return [
+    '<div class="page">',
+    '<div class="page-hdr">',
+    '<div><div class="page-title">CPM / CRMAD</div>',
+    '<div class="page-sub">Comptes-Rendus de Mise à Disposition · '+rows.length+' BUS · '+recu+' CRMAD reçus</div></div>',
+    '<div style="display:flex;align-items:center;gap:10px">',
+    '<div style="font-size:12px;color:var(--sub)">Importer un fichier CRMAD :</div>',
+    '<label style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:1px solid var(--acc);background:var(--al);color:var(--acc);font-size:13px;font-weight:500;cursor:pointer">',
+    '&#128225; Importer CRMAD <input type="file" id="cpmFileInput" accept=".xlsx" style="display:none"></label>',
+    '</div></div>',
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">',
+    krow('Total BUS',rows.length,'#6b7280','🔌',''),
+    krow('CRMAD reçus',recu,'#3b82f6','📡',rows.length?Math.round(recu/rows.length*100)+'%':''),
+    krow('Validés',valide,'#10b981','✓',''),
+    krow('Bloqués',bloque,'#ef4444','⚠',''),
+    '</div>',
+    '<div class="tbl-wrap"><div style="overflow-x:auto"><table>',
+    '<thead><tr>',
+    '<th>Topologie</th><th>Lot</th><th>RR</th><th>État BUS</th>',
+    '<th>Statut CPM</th><th>Réf. commande</th><th>Date CRMAD</th>',
+    '<th>Segments</th><th>Sites</th><th>FO</th><th>Actions</th>',
+    '</tr></thead>',
+    '<tbody>',tableRows,'</tbody>',
+    '</table></div></div>',
+    '<div id="cpmDetail"></div>',
+    '</div>',
+  ].join('');
 }
+
 
 function renderCPMDetail(topo){
   const c=S.cpm.find(x=>x.topo===topo); if(!c) return;
