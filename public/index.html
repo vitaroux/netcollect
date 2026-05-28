@@ -463,161 +463,202 @@ function pageKPI(){
   const tauxMes=okT+nokT>0?Math.round(okT/(okT+nokT)*100):0;
   const tauxCF=S.delivery.length>0?Math.round(S.delivery.filter(d=>d.cf==='OUI').length/S.delivery.length*100):0;
   const byS=Object.fromEntries((byEtat||[]).map(r=>[r.etat,r.count]));
+  const lots=byLot||[];
 
-  // Gauge SVG helper
-  function gauge(pct,col,size=64){
-    const r=26,c=size/2,circ=2*Math.PI*r,dash=circ*pct/100,gap=circ-dash;
+  function gauge(pct,col,size=68){
+    const r=27,c=size/2,circ=2*Math.PI*r,dash=circ*pct/100,gap=circ-dash;
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--brd)" stroke-width="5"/>
-      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${col}" stroke-width="5"
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--brd)" stroke-width="5.5"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${col}" stroke-width="5.5"
         stroke-dasharray="${dash} ${gap}" stroke-linecap="round"
         transform="rotate(-90 ${c} ${c})"/>
       <text x="${c}" y="${c}" text-anchor="middle" dominant-baseline="central"
-        font-size="12" font-weight="700" fill="${col}">${pct}%</text>
+        font-size="13" font-weight="700" fill="${col}">${pct}%</text>
     </svg>`;
   }
 
-  // Mini spark bar
-  function minibar(data,col){
-    const max=Math.max(...data,1);
-    return `<div style="display:flex;align-items:flex-end;gap:2px;height:28px">${data.map(v=>`<div style="flex:1;background:${col};border-radius:2px 2px 0 0;height:${Math.round(v/max*28)}px;opacity:.85"></div>`).join('')}</div>`;
-  }
+  // Points d'attention data
+  const alerts=[
+    [riskHigh||0,'#ef4444','BUS à risque élevé','⚠'],
+    [nokCount||0,'#f59e0b','Mesures NOK','📐'],
+    [sin3Nok||0,'#f97316','Sites SIN3 non MAJ','🔄'],
+    [S.bus.filter(b=>b.etat===4&&b.av<20).length,'#f87171','BUS travaux < 20%','🐢'],
+    [S.bus.filter(b=>!b.rr||b.rr==='').length,'#94a3b8','BUS sans RR affecté','👤'],
+  ];
 
-  const lots=byLot||[];
-  return `<div class="page" style="max-width:1200px">
+  return `<div class="page">
     <div class="page-hdr">
-      <div><div class="page-title">Dashboard KPI</div>
-      <div class="page-sub">${total} BUS · mis à jour ${new Date().toLocaleDateString('fr-FR')}</div></div>
+      <div>
+        <div class="page-title">Dashboard KPI</div>
+        <div class="page-sub">${total} BUS · mis à jour ${new Date().toLocaleDateString('fr-FR')}</div>
+      </div>
     </div>
 
-    <!-- Ligne 1 : 4 métriques circulaires principales -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+    <!-- ── LIGNE 1 : 4 jauges ── -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
       ${[
-        ['Taux livraison','Livrés + MES',tauxLiv,'#10b981',livres+'/'+total],
+        ['Taux livraison','Livrés + MES',tauxLiv,'#10b981',livres+'/'+total+' BUS'],
         ['Taux MES','Mise en service',tauxMES,'#06b6d4',mes_+' BUS'],
-        ['Mesures OK','Tronçons conformes',tauxMes,'#3b82f6',okT+'/'+(okT+nokT||1)],
+        ['Mesures OK','Tronçons conformes',tauxMes,'#3b82f6',okT+'/'+(okT+nokT||1)+' tronçons'],
         ['Cmd fermes','Sur total delivery',tauxCF,'#7c3aed',S.delivery.filter(d=>d.cf==='OUI').length+'/'+S.delivery.length],
       ].map(([t,sub,pct,col,det])=>`
-        <div class="card" style="display:flex;align-items:center;gap:14px">
+        <div class="card" style="display:flex;align-items:center;gap:16px">
           ${gauge(pct,col)}
-          <div style="min-width:0">
-            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:1px">${t}</div>
-            <div style="font-size:10px;color:var(--mut)">${sub}</div>
-            <div style="font-size:11px;color:${col};font-weight:600;margin-top:4px">${det}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px">${t}</div>
+            <div style="font-size:12px;color:var(--mut);margin-bottom:6px">${sub}</div>
+            <div style="font-size:13px;font-weight:600;color:${col}">${det}</div>
           </div>
         </div>`).join('')}
     </div>
 
-    <!-- Ligne 2 : états BUS détail + avancement par lot -->
-    <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;margin-bottom:12px">
+    <!-- ── LIGNE 2 : États | Lots | Points d'attention ── -->
+    <div style="display:grid;grid-template-columns:260px 1fr 260px;gap:14px;margin-bottom:14px">
 
-      <!-- États BUS : liste avec barres -->
+      <!-- États BUS -->
       <div class="card">
         <div class="section-title">Répartition des états</div>
-        <div style="position:relative;margin:4px 0 12px">
-          <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;gap:1px">
-            ${Object.entries(SC).map(([k,v])=>{
-              const n=byS[k]||0; if(!n)return'';
-              const c=CC[+k%CC.length];
-              return `<div style="flex:${n};background:${c}" title="${v.s}: ${n}"></div>`;
-            }).join('')}
-          </div>
+        <div style="height:8px;background:var(--brd);border-radius:99px;overflow:hidden;display:flex;gap:1px;margin-bottom:14px">
+          ${Object.entries(SC).map(([k])=>{const n=byS[k]||0;if(!n)return'';const c=CC[+k%CC.length];return`<div style="flex:${n};background:${c}"></div>`;}).join('')}
         </div>
         ${Object.entries(SC).map(([k,v])=>{
-          const n=byS[k]||0; if(!n) return '';
+          const n=byS[k]||0; if(!n)return'';
           const c=CC[+k%CC.length];
           const pct=Math.round(n/total*100);
-          return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--brd)">
-            <div style="width:8px;height:8px;border-radius:2px;background:${c};flex-shrink:0"></div>
-            <div style="flex:1;font-size:11px;color:var(--sub)">${v.s}</div>
-            <div style="font-size:11px;font-weight:600;color:var(--text);min-width:20px;text-align:right">${n}</div>
-            <div style="width:48px;height:3px;background:var(--brd);border-radius:99px;overflow:hidden">
+          return `<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--brd)">
+            <div style="width:9px;height:9px;border-radius:2px;background:${c};flex-shrink:0"></div>
+            <span style="font-size:13px;color:var(--sub);flex:1">${v.s}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--text);min-width:22px;text-align:right">${n}</span>
+            <div style="width:52px;height:4px;background:var(--brd);border-radius:99px;overflow:hidden;flex-shrink:0">
               <div style="width:${pct}%;height:100%;background:${c}"></div>
             </div>
-            <div style="font-size:10px;color:var(--mut);min-width:26px;text-align:right">${pct}%</div>
+            <span style="font-size:11px;color:var(--mut);min-width:28px;text-align:right">${pct}%</span>
           </div>`;
         }).join('')}
+        <!-- Totaux résumé -->
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${[[5,'Livrés','#10b981'],[4,'Travaux','#f97316'],[6,'MES','#06b6d4'],[0,'Non démarré','#94a3b8']].map(([e,l,c])=>`
+            <div style="text-align:center;padding:7px;background:var(--th);border-radius:8px">
+              <div style="font-size:17px;font-weight:700;color:${c}">${byS[e]||0}</div>
+              <div style="font-size:11px;color:var(--mut)">${l}</div>
+            </div>`).join('')}
+        </div>
       </div>
 
-      <!-- Avancement par lot : barres horizontales -->
+      <!-- Avancement par lot -->
       <div class="card">
         <div class="section-title">Avancement & progression par lot</div>
-        ${lots.length===0?'<div style="color:var(--mut);font-size:12px">Aucun lot</div>':
+        ${lots.length===0?'<div style="color:var(--mut);font-size:13px">Aucun lot</div>':
           lots.map(l=>{
             const pLiv=l.total>0?Math.round((l.livres||0)/l.total*100):0;
             const pTrx=l.total>0?Math.round((l.trx||0)/l.total*100):0;
-            return `<div style="margin-bottom:16px">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-                <div style="font-size:12px;font-weight:600;color:var(--text)">${l.lot}</div>
-                <div style="font-size:11px;color:var(--mut)">${l.total} BUS · avancement moy. <strong style="color:var(--acc)">${l.avMoy||0}%</strong></div>
+            const pAut=Math.max(0,100-pLiv-pTrx);
+            return `<div style="margin-bottom:18px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+                <div style="font-size:14px;font-weight:700;color:var(--text)">${l.lot}</div>
+                <div style="font-size:12px;color:var(--mut)">${l.total} BUS · avancement moy.&nbsp;<strong style="color:var(--acc)">${l.avMoy||0}%</strong></div>
               </div>
-              <div style="display:flex;height:10px;background:var(--brd);border-radius:99px;overflow:hidden;margin-bottom:5px">
-                <div style="width:${pLiv}%;background:#10b981;border-radius:99px 0 0 99px" title="Livrés: ${l.livres||0}"></div>
-                <div style="width:${pTrx}%;background:#f97316" title="Travaux: ${l.trx||0}"></div>
-                <div style="flex:1;background:var(--al)"></div>
+              <div style="display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--brd);gap:1px;margin-bottom:7px">
+                <div style="width:${pLiv}%;background:#10b981" title="Livrés/MES"></div>
+                <div style="width:${pTrx}%;background:#f97316" title="Travaux"></div>
+                <div style="width:${pAut}%;background:var(--al)" title="Autres"></div>
               </div>
-              <div style="display:flex;gap:12px">
-                <span style="font-size:10px;color:#10b981">■ Livrés/MES ${l.livres||0} (${pLiv}%)</span>
-                <span style="font-size:10px;color:#f97316">■ Travaux ${l.trx||0} (${pTrx}%)</span>
-                <span style="font-size:10px;color:var(--mut)">■ Autres ${l.total-(l.livres||0)-(l.trx||0)}</span>
+              <div style="display:flex;gap:16px">
+                <span style="font-size:12px;color:#10b981;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block"></span>Livrés/MES ${l.livres||0} (${pLiv}%)</span>
+                <span style="font-size:12px;color:#f97316;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#f97316;display:inline-block"></span>Travaux ${l.trx||0} (${pTrx}%)</span>
+                <span style="font-size:12px;color:var(--mut);display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--brd);display:inline-block"></span>Autres ${l.total-(l.livres||0)-(l.trx||0)}</span>
               </div>
             </div>`;
           }).join('')}
+        <!-- Totaux lot en grille -->
+        <div style="margin-top:4px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;border-top:1px solid var(--brd);padding-top:14px">
+          ${lots.map(l=>`
+            <div style="background:var(--th);border-radius:9px;padding:10px 12px;border:1px solid var(--brd)">
+              <div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:6px">${l.lot}</div>
+              ${[['Total',l.total,'var(--text)'],['Travaux',l.trx,'#f97316'],['Livrés',l.livres,'#10b981']].map(([label,val,c])=>`
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+                  <span style="color:var(--sub)">${label}</span>
+                  <span style="font-weight:600;color:${c}">${val||0}</span>
+                </div>`).join('')}
+            </div>`).join('')}
+        </div>
       </div>
-    </div>
-
-    <!-- Ligne 3 : alertes + graphiques -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
 
       <!-- Points d'attention -->
       <div class="card">
         <div class="section-title">Points d'attention</div>
-        ${[
-          [riskHigh||0,'#ef4444','BUS à risque élevé','⚠'],
-          [nokCount||0,'#f59e0b','Mesures NOK','📐'],
-          [sin3Nok||0,'#f97316','Sites SIN3 non MAJ','🔄'],
-          [S.bus.filter(b=>b.etat===4&&b.av<20).length,'#f87171','BUS travaux <20%','🐢'],
-          [S.bus.filter(b=>!b.rr||b.rr==='').length,'#94a3b8','BUS sans RR affecté','👤'],
-        ].map(([n,c,l,ic])=>`
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--brd)">
-            <div style="width:28px;height:28px;border-radius:7px;background:${c}15;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${ic}</div>
-            <div style="flex:1;font-size:11px;color:var(--sub)">${l}</div>
-            <div style="font-size:16px;font-weight:700;color:${n>0?c:'var(--mut)'}">${n}</div>
+        ${alerts.map(([n,c,l,ic])=>`
+          <div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--brd)">
+            <div style="width:30px;height:30px;border-radius:8px;background:${c}15;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${ic}</div>
+            <div style="flex:1;font-size:13px;color:var(--sub)">${l}</div>
+            <div style="font-size:18px;font-weight:700;color:${n>0?c:'var(--mut)'}">${n}</div>
           </div>`).join('')}
-      </div>
-
-      <!-- Avancement / RR -->
-      <div class="card">
-        <div class="section-title">Avancement moyen par RR</div>
-        <canvas id="rrChart" height="210"></canvas>
-      </div>
-
-      <!-- États donut -->
-      <div class="card" style="display:flex;flex-direction:column">
-        <div class="section-title">Distribution états</div>
-        <canvas id="pieChart" style="flex:1;max-height:210px"></canvas>
+        <!-- Avancement global -->
+        <div style="margin-top:14px;padding:12px;background:var(--al);border-radius:9px;border:1px solid var(--brd)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">Avancement global</span>
+            <span style="font-size:20px;font-weight:700;color:var(--acc)">${avGlobal||0}%</span>
+          </div>
+          <div style="height:7px;background:var(--brd);border-radius:99px;overflow:hidden">
+            <div style="width:${avGlobal||0}%;height:100%;background:var(--acc);border-radius:99px"></div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Ligne 4 : livraisons prévisionnelles par semaine -->
+    <!-- ── LIGNE 3 : Avancement RR | Donut états ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="section-title">Avancement moyen par RR</div>
+        <canvas id="rrChart" height="230"></canvas>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="section-title">Distribution des états</div>
+        <div style="display:grid;grid-template-columns:1fr 180px;gap:16px;flex:1;align-items:center">
+          <canvas id="pieChart" style="max-height:230px"></canvas>
+          <!-- Légende détaillée -->
+          <div>
+            ${Object.entries(SC).map(([k,v])=>{
+              const n=byS[k]||0; if(!n)return'';
+              const c=CC[+k%CC.length];
+              const pct=Math.round(n/total*100);
+              return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+                <div style="width:10px;height:10px;border-radius:3px;background:${c};flex-shrink:0"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.s}</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+                    <div style="flex:1;height:3px;background:var(--brd);border-radius:99px;overflow:hidden">
+                      <div style="width:${pct}%;height:100%;background:${c}"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:600;color:${c}">${n}</span>
+                  </div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LIGNE 4 : Livraisons prévisionnelles ── -->
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div class="section-title" style="margin:0">Livraisons prévisionnelles</div>
-        <div style="font-size:11px;color:var(--mut)">${S.bus.filter(b=>b.liv&&b.liv!=='').length} BUS avec date prévisionnelle</div>
+        <div style="font-size:12px;color:var(--mut)">${S.bus.filter(b=>b.liv&&b.liv!=='').length} BUS avec date prévisionnelle</div>
       </div>
       ${(()=>{
         const withLiv=S.bus.filter(b=>b.liv&&b.etat<5);
-        if(!withLiv.length) return '<div style="color:var(--mut);font-size:12px;text-align:center;padding:20px">Aucune date prévisionnelle renseignée</div>';
+        if(!withLiv.length) return '<div style="color:var(--mut);font-size:13px;text-align:center;padding:20px">Aucune date prévisionnelle renseignée</div>';
         const bySem={};
-        withLiv.forEach(b=>{const k=b.liv.slice(0,9);bySem[k]=(bySem[k]||0)+1;});
-        const sems=Object.entries(bySem).sort(([a],[b])=>a.localeCompare(b)).slice(0,10);
-        const max=Math.max(...sems.map(([,v])=>v),1);
-        return `<div style="display:flex;align-items:flex-end;gap:6px;height:60px;padding:0 4px">
+        withLiv.forEach(b=>{const k=b.liv.slice(0,9).trim();if(k)bySem[k]=(bySem[k]||0)+1;});
+        const sems=Object.entries(bySem).sort(([a],[b])=>a.localeCompare(b)).slice(0,12);
+        const maxN=Math.max(...sems.map(([,v])=>v),1);
+        return `<div style="display:grid;grid-template-columns:repeat(${sems.length},1fr);gap:8px;align-items:flex-end;height:80px">
           ${sems.map(([s,n])=>`
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-              <div style="font-size:9px;color:var(--acc);font-weight:600">${n}</div>
-              <div style="width:100%;background:var(--acc);border-radius:3px 3px 0 0;height:${Math.round(n/max*40)+8}px;opacity:.8"></div>
-              <div style="font-size:8px;color:var(--mut);white-space:nowrap">${s}</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end">
+              <div style="font-size:11px;font-weight:600;color:var(--acc)">${n}</div>
+              <div style="width:100%;background:var(--acc);border-radius:5px 5px 0 0;height:${Math.round(n/maxN*52)+10}px;opacity:.75;min-height:10px"></div>
+              <div style="font-size:10px;color:var(--mut);white-space:nowrap;text-align:center">${s}</div>
             </div>`).join('')}
         </div>`;
       })()}
