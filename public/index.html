@@ -437,7 +437,7 @@ function openBusForm(bus) {
     const errEl = document.getElementById('busFormErr');
     if(!data.id){errEl.textContent='Le nom de topologie est obligatoire';errEl.style.display='';return;}
     if(!data.lot){errEl.textContent='Le lot est obligatoire';errEl.style.display='';return;}
-    if(data.av<0||data.av>100){errEl.textContent='L'avancement doit être entre 0 et 100';errEl.style.display='';return;}
+    if(data.av<0||data.av>100){errEl.textContent="L'avancement doit être entre 0 et 100";errEl.style.display='';return;}
     try {
       if(isEdit){
         await api.put('/api/bus/'+encodeURIComponent(bus.id), data);
