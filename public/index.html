@@ -1262,7 +1262,9 @@ function renderSidebar(){
   });
   h+='</div>';
   h+=`<div class="sb-foot">
-    <button class="theme-btn" id="themeBtn">${S.dark?'☀ Mode clair':'🌙 Mode sombre'}</button>
+    <button id="themeBtn" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--brd);background:transparent;color:var(--sub);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit">
+      ${S.dark?'☀ Mode clair':'🌙 Mode sombre'}
+    </button>
     ${u.nom?`<button id="logoutBtn" style="width:100%;margin-top:6px;padding:7px 10px;border-radius:8px;border:none;background:transparent;color:var(--mut);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;transition:color .15s">
       <span style="font-size:13px">⎋</span><span>Déconnexion</span>
     </button>`:''}
