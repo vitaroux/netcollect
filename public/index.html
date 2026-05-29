@@ -241,6 +241,42 @@ select option{background:var(--card)}
 <div id="main"><div class="page" style="display:flex;align-items:center;justify-content:center;height:100%"><div class="spinner"></div> Chargement...</div></div>
 <div id="mo-overlay"></div>
 
+<!-- User Form Overlay -->
+<div id="userFormOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border:1px solid var(--brd);border-radius:14px;width:100%;max-width:520px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="background:var(--acc);border-radius:14px 14px 0 0;padding:18px 22px;display:flex;justify-content:space-between;align-items:center">
+      <div id="userFormTitle" style="font-size:16px;font-weight:700;color:#fff">Utilisateur</div>
+      <button id="closeUserForm" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div style="padding:22px">
+      <div id="userFormError" style="display:none;padding:10px 14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;color:#ef4444;font-size:13px;margin-bottom:14px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Nom <span style="color:#ef4444">*</span></div><input id="uf_nom" style="width:100%" placeholder="NOM"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Prénom <span style="color:#ef4444">*</span></div><input id="uf_prenom" style="width:100%" placeholder="Prénom"></div>
+        <div style="grid-column:1/-1"><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Email <span style="color:#ef4444">*</span></div><input id="uf_email" type="email" style="width:100%" placeholder="prenom.nom@email.fr"></div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Profil <span style="color:#ef4444">*</span></div>
+          <select id="uf_profil" style="width:100%">
+            <option value="">-- Choisir --</option>
+            <option>Admin</option><option>Pilote</option><option>CDP</option><option>CDR</option><option>BE</option>
+          </select>
+        </div>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:5px">Mot de passe</div>
+          <input id="uf_password" type="password" style="width:100%" placeholder="Laisser vide = inchangé">
+          <div id="uf_pwd_hint" style="font-size:11px;color:var(--mut);margin-top:4px">Par défaut : Temp1234!</div>
+        </div>
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="uf_actif" style="width:auto" checked>
+          <label for="uf_actif" style="font-size:13px;color:var(--sub);cursor:pointer">Compte actif</label>
+        </div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" id="cancelUserForm">Annuler</button>
+          <button class="btn primary" id="submitUserForm">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ── CONFIG ──────────────────────────────────────
@@ -1824,9 +1860,9 @@ function pageUsers(){
     <div class="page-hdr">
       <div>
         <div class="page-title">Utilisateurs</div>
-        <div class="page-sub">${S.users.length} comptes · <span style="color:#10b981;font-weight:600">${online} en ligne</span> · ${recent} actifs < 30min</div>
+        <div class="page-sub">${S.users.length} compte(s) · <span style="color:#10b981;font-weight:600">${online} en ligne</span> · ${recent} actifs < 30min</div>
       </div>
-      <button class="btn primary" id="newUserBtn">+ Nouvel utilisateur</button>
+      <button class="btn primary" id="openCreateUser">+ Nouvel utilisateur</button>
     </div>
 
     <!-- Statuts rapides -->
