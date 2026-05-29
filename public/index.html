@@ -42,7 +42,7 @@ body{background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display
 
 /* ── LAYOUT ── */
 #sidebar{width:230px;background:var(--sb);border-right:1px solid var(--sbb);display:flex;flex-direction:column;flex-shrink:0;height:100vh}
-#main{flex:1;overflow-y:auto;overflow-x:hidden;height:100vh}
+#main{flex:1;overflow-y:auto;overflow-x:hidden;height:100vh;display:flex;flex-direction:column}
 
 /* ── SIDEBAR ── */
 .sb-logo{padding:18px 16px 14px;border-bottom:1px solid var(--sbb)}
@@ -1384,9 +1384,11 @@ function pageKPI(){
   const nokT=S.mesures.reduce((a,m)=>a+(m.nok||0),0);
   const lots=(byLot||[]);
 
-  return `<div class="page" style="padding:18px 24px;display:flex;flex-direction:column;gap:14px;min-height:calc(100vh - 60px)">
+  // Hauteur dispo = viewport - sidebar header - page padding - lignes 1 et 3
+  // On utilise calc avec CSS pour que ça s'adapte à l'écran
+  return `<div style="padding:16px 22px;height:100%;display:flex;flex-direction:column;gap:12px;box-sizing:border-box">
 
-    <!-- Ligne 1 : 4 KPIs -->
+    <!-- KPIs -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;flex-shrink:0">
       ${[
         ['Taux livraison', Math.round(livres/total*100)+'%', livres+'/'+total+' BUS', '#10b981', '✓'],
@@ -1403,50 +1405,49 @@ function pageKPI(){
       </div>`).join('')}
     </div>
 
-    <!-- Ligne 2 : États + Par Lot + Avancement RR -->
-    <div style="display:grid;grid-template-columns:220px 1fr 1fr;gap:12px;flex-shrink:0">
+    <!-- Graphiques — flex:1 pour occuper tout l'espace restant -->
+    <div style="display:grid;grid-template-columns:210px 1fr 1fr;gap:12px;flex:1;min-height:0">
 
-      <!-- États BUS donut -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">États BUS</div>
-        <div style="display:flex;justify-content:center;margin-bottom:12px">
+      <!-- États BUS -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh);display:flex;flex-direction:column">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;flex-shrink:0">États BUS</div>
+        <div style="display:flex;justify-content:center;flex-shrink:0;margin-bottom:10px">
           <canvas id="pieChart" width="150" height="150"></canvas>
         </div>
-        <div>
+        <div style="flex:1;overflow:hidden">
           ${Object.entries(SC).map(([k,v])=>{
             const n=(byEtat||[]).find(r=>r.etat==k)?.count||0;
             if(!n) return '';
             const c=CC[+k%CC.length];
-            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
               <div style="width:8px;height:8px;border-radius:2px;background:${c};flex-shrink:0"></div>
-              <span style="font-size:11px;color:var(--sub);flex:1">${v.s}</span>
-              <span style="font-size:12px;font-weight:600;color:var(--text)">${n}</span>
+              <span style="font-size:12px;color:var(--sub);flex:1">${v.s}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--text)">${n}</span>
             </div>`;
           }).join('')}
         </div>
       </div>
 
       <!-- Par Lot -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Par Lot</div>
-        <div style="height:260px;position:relative">
-          <canvas id="barChart"></canvas>
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh);display:flex;flex-direction:column">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;flex-shrink:0">Par Lot</div>
+        <div style="flex:1;min-height:0;position:relative">
+          <canvas id="barChart" style="position:absolute;inset:0;width:100%!important;height:100%!important"></canvas>
         </div>
       </div>
 
       <!-- Avancement par RR -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Avancement par RR</div>
-        <div style="height:260px;position:relative">
-          <canvas id="rrChart"></canvas>
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh);display:flex;flex-direction:column">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;flex-shrink:0">Avancement par RR</div>
+        <div style="flex:1;min-height:0;position:relative">
+          <canvas id="rrChart" style="position:absolute;inset:0;width:100%!important;height:100%!important"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- Ligne 3 : Points d'attention + Avancement lot -->
+    <!-- Points d'attention + Avancement lot -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
 
-      <!-- Points d'attention -->
       <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
         <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Points d'attention</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
@@ -1462,7 +1463,6 @@ function pageKPI(){
         </div>
       </div>
 
-      <!-- Avancement livraison par lot -->
       <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
         <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Avancement livraison / lot</div>
         ${lots.map(l=>{
@@ -1475,8 +1475,8 @@ function pageKPI(){
               <span style="font-size:12px;color:${col};font-weight:600">${pLiv}% livrés · ${l.livres||0}/${l.total}</span>
             </div>
             <div style="height:8px;background:var(--brd);border-radius:99px;overflow:hidden;display:flex">
-              <div style="width:${pLiv}%;background:#10b981;transition:width .4s"></div>
-              <div style="width:${pTrx}%;background:#f97316;transition:width .4s"></div>
+              <div style="width:${pLiv}%;background:#10b981"></div>
+              <div style="width:${pTrx}%;background:#f97316"></div>
             </div>
           </div>`;
         }).join('')}
