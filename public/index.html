@@ -2040,6 +2040,7 @@ function pageCPM(){
     krow('Validés',valide,'#10b981','✓',''),
     krow('Bloqués',bloque,'#ef4444','⚠',''),
     '</div>',
+    '<div id="cpmDetail"></div>',
     '<div class="tbl-wrap"><div style="overflow-x:auto"><table>',
     '<thead><tr>',
     '<th>Topologie</th><th>Lot</th><th>RR</th><th>État BUS</th>',
@@ -2048,7 +2049,6 @@ function pageCPM(){
     '</tr></thead>',
     '<tbody>',tableRows,'</tbody>',
     '</table></div></div>',
-    '<div id="cpmDetail"></div>',
     '</div>',
   ].join('');
 }
@@ -2105,7 +2105,7 @@ function renderCPMDetail(topo){
     tabContent='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
       +Object.entries(typeColors).map(function(e2){const n=segs.filter(function(s){return s.type===e2[0];}).length;return n?'<span class="badge" style="background:'+e2[1]+'18;color:'+e2[1]+';cursor:pointer">'+esc(e2[0])+' ('+n+')</span>':'';}).join('')
       +'</div>'
-      +'<div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table>'
+      +'<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table>'
       +'<thead><tr><th>Réf. segment</th><th>Sous-ref</th><th>Type</th><th>Date MESC</th><th>GTR</th><th>Long. (m)</th><th>Ext. A</th><th>Ext. B</th></tr></thead>'
       +'<tbody>'+segs.map(function(s,i){return '<tr class="'+(i%2?'odd':'even')+'">'
         +'<td><span class="mono" style="font-size:11px;color:var(--sub)">'+esc((s.ref_seg||'').slice(0,22))+'</span></td>'
@@ -2176,7 +2176,8 @@ function renderCPMDetail(topo){
       +'</tbody></table></div>';
   }
 
-  el.innerHTML='<div class="card" style="margin-top:16px">'
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  el.innerHTML='<div class="card" style="margin-bottom:16px;border:1px solid var(--acc);min-height:500px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
     +'<div><div style="font-size:16px;font-weight:700;color:var(--text)">'+esc(topo)+'</div>'
     +'<div style="font-size:12px;color:var(--sub);margin-top:2px">Réf. : <span style="font-family:monospace">'+esc(c.ref_commande||'')+'</span> · Import : '+(c.imported_at?String(c.imported_at).slice(0,10):'–')+'</div></div>'
