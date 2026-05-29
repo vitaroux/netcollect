@@ -1287,26 +1287,7 @@ function ouvrirDebrief(ref_fibre, ref_segment, topo){
       });
     });
 
-    // Boutons choix
-    mo.querySelectorAll('[data-debrief-choice]').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        const [key,val] = btn.dataset.debriefChoice.split(':');
-        form[key] = val;
-        // Navigation dans l'arbre
-        if(key==='resultat'){
-          form.step = val==='Fait' ? 'conforme' : 'non_fait';
-        } else if(key==='lien_conforme'){
-          form.step = val==='Oui' ? 'mesures_ok' : 'type_defaut';
-        } else if(key==='type_defaut'){
-          form.step = 'detail_defaut';
-        } else if(key==='raison_non_fait'){
-          form.step = val==='Autre' ? 'raison_autre' : 'confirm_non_fait';
-        }
-        document.getElementById('debriefForm').innerHTML = renderDebriefStep(form);
-        rebindDebrief(form, ref_fibre, ref_segment, topo);
-      });
-    });
-
+    bindDebriefChoices(form, ref_fibre, ref_segment, topo);
     rebindDebrief(form, ref_fibre, ref_segment, topo);
   }
 
@@ -1415,6 +1396,22 @@ function renderDebriefStep(form){
   }
 
   return html;
+}
+
+function bindDebriefChoices(form, ref_fibre, ref_segment, topo){
+  // Bind choice buttons — called after every form update
+  document.querySelectorAll('[data-debrief-choice]').forEach(btn=>{
+    // Remove old listeners by cloning
+    const fresh = btn.cloneNode(true);
+    btn.parentNode.replaceChild(fresh, btn);
+    fresh.addEventListener('click',()=>{
+      const [key,val] = fresh.dataset.debriefChoice.split(':');
+      form[key] = val;
+      document.getElementById('debriefForm').innerHTML = renderDebriefStep(form);
+      bindDebriefChoices(form, ref_fibre, ref_segment, topo);
+      rebindDebrief(form, ref_fibre, ref_segment, topo);
+    });
+  });
 }
 
 function rebindDebrief(form, ref_fibre, ref_segment, topo){
