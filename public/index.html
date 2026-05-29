@@ -2491,12 +2491,13 @@ async function navigate(page){
 }
 
 function filterBus(){
+  const f=S.fBus||{};
   let r=[...S.bus];
-  if(S.fq) r=r.filter(b=>(b.id+b.ext+b.rr).toLowerCase().includes(S.fq.toLowerCase()));
-  if(S.fl) r=r.filter(b=>b.lot===S.fl);
-  if(S.fe!=='') r=r.filter(b=>b.etat===+S.fe);
-  if(S.fr) r=r.filter(b=>b.rr===S.fr);
-  if(S.fk) r=r.filter(b=>b.risque===S.fk);
+  if(f.q)   r=r.filter(b=>(b.id+' '+(b.ext||'')+' '+(b.rr||'')).toLowerCase().includes(f.q.toLowerCase()));
+  if(f.lot) r=r.filter(b=>b.lot===f.lot);
+  if(f.etat!==undefined&&f.etat!=='') r=r.filter(b=>b.etat===+f.etat);
+  if(f.rr)  r=r.filter(b=>(b.rr||'').toLowerCase().includes(f.rr.toLowerCase()));
+  if(f.risque) r=r.filter(b=>b.risque===f.risque);
   return r.sort((a,b)=>typeof a[S.sk]==='number'?(a[S.sk]-b[S.sk])*S.sd:String(a[S.sk]||'').localeCompare(String(b[S.sk]||''))*S.sd);
 }
 
