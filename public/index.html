@@ -1261,10 +1261,10 @@ function renderSidebar(){
     nav.filter(n=>n.g===g).forEach(n=>{h+=`<button class="sb-btn${S.page===n.id?' active':''}" data-page="${n.id}">${n.i} ${n.l}</button>`;});
   });
   h+='</div>';
-  h+=`<div class="sb-foot" style="display:flex;flex-direction:column;gap:6px">
+  h+=`<div class="sb-foot">
     <button class="theme-btn" id="themeBtn">${S.dark?'☀ Mode clair':'🌙 Mode sombre'}</button>
-    ${u.nom?`<button id="logoutBtn" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.06);color:#ef4444;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:7px;font-family:inherit">
-      <span>⎋</span><span>Déconnexion</span>
+    ${u.nom?`<button id="logoutBtn" style="width:100%;margin-top:6px;padding:7px 10px;border-radius:8px;border:none;background:transparent;color:var(--mut);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;transition:color .15s">
+      <span style="font-size:13px">⎋</span><span>Déconnexion</span>
     </button>`:''}
   </div>`;
   document.getElementById('sidebar').innerHTML=h;
