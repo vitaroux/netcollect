@@ -2121,26 +2121,33 @@ function renderCPMDetail(topo){
           +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:11px">'+esc(s.ext_a||'')+'</span></div>'
           +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:11px">'+esc(s.ext_b||'')+'</span></div>'
           +'</div>'
-          // Fibres sub-table
-          +(fibres.length?'<div style="background:var(--inp);border-top:1px solid var(--brd);padding:4px 12px 6px">'
-            +'<div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'+fibres.length+' référence(s) fibre</div>'
-            +'<table style="width:100%;font-size:11px">'
-            +'<thead><tr>'
-            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Réf. fibre</th>'
-            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site A</th>'
-            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">PDL A</th>'
-            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">PDL B</th>'
-            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site B</th>'
-            +'</tr></thead><tbody>'
-            +fibres.map(function(f,fi){return '<tr style="background:'+(fi%2?'transparent':'rgba(124,58,237,.03)')+'">'
-              +'<td style="padding:3px 6px"><span class="mono" style="font-size:10px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span></td>'
-              +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_a||'')+'</span></td>'
-              +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_a||'')+'</td>'
-              +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_b||'')+'</td>'
-              +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_b||'')+'</span></td>'
-              +'</tr>';}).join('')
-            +'</tbody></table></div>'
-          :'<div style="padding:4px 12px;font-size:10px;color:var(--mut)">Aucune référence fibre</div>')
+          // Fibres sub-table — collapsible
+          +(fibres.length
+            ?'<div style="border-top:1px solid var(--brd)">'
+              +'<button class="fibre-toggle" data-seg="'+esc(s.ref_seg)+'" style="width:100%;padding:6px 12px;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--sub);font-size:11px;font-family:inherit;text-align:left">'
+              +'<span class="fibre-arrow" style="font-size:10px;transition:transform .2s">▶</span>'
+              +'<span>'+fibres.length+' référence(s) fibre</span>'
+              +'</button>'
+              +'<div class="fibre-panel" data-seg="'+esc(s.ref_seg)+'" style="display:none;background:var(--inp);padding:4px 12px 8px">'
+              +'<table style="width:100%;font-size:11px">'
+              +'<thead><tr>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Réf. fibre</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site A</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">PDL A</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">PDL B</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site B</th>'
+              +'</tr></thead><tbody>'
+              +fibres.map(function(f,fi){return '<tr style="background:'+(fi%2?'transparent':'rgba(124,58,237,.03)')+'">'
+                +'<td style="padding:3px 6px"><span class="mono" style="font-size:10px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span></td>'
+                +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_a||'')+'</span></td>'
+                +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_a||'')+'</td>'
+                +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_b||'')+'</td>'
+                +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_b||'')+'</span></td>'
+                +'</tr>';}).join('')
+              +'</tbody></table>'
+              +'</div>'
+              +'</div>'
+            :'<div style="padding:4px 12px;font-size:10px;color:var(--mut)">Aucune référence fibre</div>')
           +'</div>';
       }).join('')
       +'</div>';
@@ -2215,6 +2222,19 @@ function renderCPMDetail(topo){
     +'</div>';
 
   document.getElementById('closeCPMDetail')?.addEventListener('click',()=>{el.innerHTML='';S.cpmTab=null;});
+
+  // Fibre toggle (event delegation)
+  el.querySelectorAll('.fibre-toggle').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const seg=btn.dataset.seg;
+      const panel=el.querySelector('.fibre-panel[data-seg="'+seg+'"]');
+      const arrow=btn.querySelector('.fibre-arrow');
+      if(!panel) return;
+      const open=panel.style.display==='none';
+      panel.style.display=open?'block':'none';
+      arrow.style.transform=open?'rotate(90deg)':'rotate(0deg)';
+    });
+  });
   document.querySelectorAll('[data-cpmsubtab]').forEach(btn=>btn.addEventListener('click',()=>{S.cpmTab=btn.dataset.cpmsubtab;renderCPMDetail(topo);}));
   document.getElementById('saveCPMBtn')?.addEventListener('click',async()=>{
     const statut=document.getElementById('cpmStatutSel')?.value;
