@@ -2479,8 +2479,7 @@ function bindPageEvents(){
   document.getElementById('loginPrompt')?.addEventListener('click', openUserPicker);
   const logoutBtn=document.getElementById('logoutBtn');
   if(logoutBtn) logoutBtn.addEventListener('click',()=>{if(confirm('Se déconnecter ?')) doLogout();});
-  const tb=document.getElementById('themeBtn');
-  if(tb) tb.addEventListener('click',()=>{S.dark=!S.dark;document.body.classList.toggle('dk',S.dark);localStorage.setItem('nc_dark',S.dark?'1':'');renderSidebar();renderMain();});
+  // themeBtn géré dans renderSidebar
 
 
 
