@@ -1384,16 +1384,16 @@ function pageKPI(){
   const nokT=S.mesures.reduce((a,m)=>a+(m.nok||0),0);
   const lots=(byLot||[]);
 
-  return `<div class="page" style="padding:16px 20px;height:calc(100vh - 0px);overflow:hidden;display:flex;flex-direction:column;gap:12px">
+  return `<div class="page" style="padding:16px 20px">
 
     <!-- Titre -->
-    <div style="flex-shrink:0;display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div><div class="page-title" style="font-size:17px">Dashboard KPI</div>
         <div class="page-sub">Vue management · Indicateurs de performance</div></div>
     </div>
 
-    <!-- Ligne 1 : 4 KPIs compacts -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0">
+    <!-- Ligne 1 : 4 KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
       ${[
         ['Taux livraison', Math.round(livres/total*100)+'%', livres+'/'+total+' BUS', '#10b981', '✓'],
         ['Taux MES', Math.round(mes/total*100)+'%', mes+' BUS', '#06b6d4', '⚡'],
@@ -1407,80 +1407,78 @@ function pageKPI(){
       </div>`).join('')}
     </div>
 
-    <!-- Ligne 2 : États + Par Lot + Avancement RR -->
-    <div style="display:grid;grid-template-columns:220px 1fr 1fr;gap:10px;flex:1;min-height:0">
+    <!-- Ligne 2 : États + Par Lot + Avancement RR — hauteur fixe -->
+    <div style="display:grid;grid-template-columns:210px 1fr 1fr;gap:10px;margin-bottom:14px">
 
-      <!-- États BUS donut compact -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px;display:flex;flex-direction:column">
+      <!-- États BUS -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
         <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">États BUS</div>
-        <div style="display:flex;justify-content:center;flex-shrink:0">
-          <canvas id="pieChart" width="140" height="140"></canvas>
+        <div style="display:flex;justify-content:center;margin-bottom:8px">
+          <canvas id="pieChart" width="130" height="130"></canvas>
         </div>
-        <div style="flex:1;overflow:hidden;margin-top:8px">
+        <div>
           ${Object.entries(SC).map(([k,v])=>{
             const n=(byEtat||[]).find(r=>r.etat==k)?.count||0;
-            if(!n)return'';
+            if(!n) return '';
             const c=CC[+k%CC.length];
             return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
               <div style="width:6px;height:6px;border-radius:1px;background:${c};flex-shrink:0"></div>
               <span style="font-size:10px;color:var(--sub);flex:1">${v.s}</span>
-              <span style="font-size:10px;font-weight:600;color:var(--text)">${n}</span>
+              <span style="font-size:11px;font-weight:600;color:var(--text)">${n}</span>
             </div>`;
           }).join('')}
         </div>
       </div>
 
-      <!-- Par Lot barres -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px;display:flex;flex-direction:column">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">Par Lot</div>
-        <div style="flex:1;min-height:0;position:relative">
-          <canvas id="barChart" style="width:100%;height:100%"></canvas>
+      <!-- Par Lot — hauteur fixe 240px -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Par Lot</div>
+        <div style="height:220px;position:relative">
+          <canvas id="barChart"></canvas>
         </div>
       </div>
 
-      <!-- Avancement par RR -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px;display:flex;flex-direction:column">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">Avancement par RR</div>
-        <div style="flex:1;min-height:0;position:relative">
-          <canvas id="rrChart" style="width:100%;height:100%"></canvas>
+      <!-- Avancement par RR — hauteur fixe 240px -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Avancement par RR</div>
+        <div style="height:220px;position:relative">
+          <canvas id="rrChart"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- Ligne 3 : Points d'attention + stats rapides -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex-shrink:0">
+    <!-- Ligne 3 : Points d'attention + Avancement lot -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 
-      <!-- Points d'attention -->
       <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Points d'attention</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">Points d'attention</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
           ${[
-            ['BUS risque ↑', riskHigh||0, '#ef4444'],
-            ['Mesures NOK', nokCount||0, '#f59e0b'],
-            ['SIN3 non MAJ', sin3Nok||0, '#f97316'],
-            ['Chantiers <20%', S.bus.filter(b=>b.etat===4&&b.av<20).length, '#8b5cf6'],
-          ].map(([l,v,c])=>`<div style="text-align:center;padding:8px;background:var(--th);border-radius:8px;border-top:2px solid ${c}">
-            <div style="font-size:18px;font-weight:700;color:${c}">${v}</div>
-            <div style="font-size:10px;color:var(--mut);margin-top:2px">${l}</div>
+            ['BUS risque ↑',       riskHigh||0,  '#ef4444'],
+            ['Mesures NOK',        nokCount||0,  '#f59e0b'],
+            ['SIN3 non MAJ',       sin3Nok||0,   '#f97316'],
+            ['Chantiers <20%',     S.bus.filter(b=>b.etat===4&&b.av<20).length, '#8b5cf6'],
+          ].map(([l,v,c])=>`<div style="text-align:center;padding:10px 6px;background:var(--th);border-radius:8px;border-top:3px solid ${c}">
+            <div style="font-size:22px;font-weight:700;color:${c}">${v}</div>
+            <div style="font-size:10px;color:var(--mut);margin-top:3px">${l}</div>
           </div>`).join('')}
         </div>
       </div>
 
-      <!-- Avancement par lot barres linéaires -->
       <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Avancement livraison / lot</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">Avancement livraison / lot</div>
         ${lots.map(l=>{
           const pLiv=l.total?Math.round((l.livres||0)/l.total*100):0;
           const pTrx=l.total?Math.round((l.trx||0)/l.total*100):0;
           const col=pLiv>=60?'#10b981':pLiv>=30?'#f59e0b':'#ef4444';
-          return `<div style="margin-bottom:8px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          return `<div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
               <span class="lot-badge">${l.lot}</span>
               <span style="font-size:11px;color:${col};font-weight:600">${pLiv}% livrés · ${l.livres||0}/${l.total}</span>
             </div>
-            <div style="height:6px;background:var(--brd);border-radius:99px;overflow:hidden;display:flex">
-              <div style="width:${pLiv}%;background:#10b981;transition:width .4s"></div>
-              <div style="width:${pTrx}%;background:#f97316;transition:width .4s"></div>
+            <div style="height:7px;background:var(--brd);border-radius:99px;overflow:hidden;display:flex">
+              <div style="width:${pLiv}%;background:#10b981"></div>
+              <div style="width:${pTrx}%;background:#f97316"></div>
             </div>
           </div>`;
         }).join('')}
