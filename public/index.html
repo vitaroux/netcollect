@@ -2416,16 +2416,20 @@ function renderCPMDetail(topo){
               +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site B</th>'
               +'</tr></thead><tbody>'
               +fibres.map(function(f,fi){
-              const mfCount=(MesuresCache[f.ref_fibre]||[]).length;
-              const lastMf=(MesuresCache[f.ref_fibre]||[])[0];
+              const mfs=(MesuresCache[f.ref_fibre]||[]);
+              const mfCount=mfs.length;
+              const lastMf=mfs[0];
               const mfOk=lastMf&&lastMf.lien_conforme==='Oui';
               const mfNok=lastMf&&(lastMf.lien_conforme==='Non');
               const mfNf=lastMf&&lastMf.resultat==='Non Fait';
-              const statusDot=mfOk?'#10b981':mfNok?'#ef4444':mfNf?'#94a3b8':'#334155';
-              const statusTitle=mfOk?'OK':mfNok?'NOK':mfNf?'Non Fait':'Aucune mesure';
-              return '<tr style="background:'+(fi%2?'transparent':'rgba(124,58,237,.03)')+'">'
-                +'<td style="padding:3px 6px"><div style="display:flex;align-items:center;gap:5px">'
-                +'<div title="'+statusTitle+'" style="width:7px;height:7px;border-radius:50%;background:'+statusDot+';flex-shrink:0"></div>'
+              // Couleur de fond de la ligne
+              const rowBg=mfOk?'rgba(16,185,129,.10)':mfNok?'rgba(239,68,68,.10)':mfNf?'rgba(148,163,184,.07)':'transparent';
+              const rowBorder=mfOk?'border-left:3px solid #10b981':mfNok?'border-left:3px solid #ef4444':'border-left:3px solid transparent';
+              const statusLabel=mfOk?'✓ OK':mfNok?'✗ NOK':mfNf?'– Non fait':'';
+              const statusColor=mfOk?'#10b981':mfNok?'#ef4444':'#94a3b8';
+              return '<tr style="background:'+rowBg+';'+rowBorder+'">'
+                +'<td style="padding:3px 6px">'
+                +'<div style="display:flex;align-items:center;gap:5px">'
                 +'<span class="mono" style="font-size:10px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span>'
                 +'</div></td>'
                 +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_a||'')+'</span></td>'
@@ -2433,8 +2437,9 @@ function renderCPMDetail(topo){
                 +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_b||'')+'</td>'
                 +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_b||'')+'</span></td>'
                 +'<td style="padding:3px 6px;text-align:right">'
+                +(statusLabel?'<span style="font-size:10px;font-weight:700;color:'+statusColor+';margin-right:6px">'+statusLabel+'</span>':'')
                 +'<button class="btn-debrief" data-ref-fibre="'+esc(f.ref_fibre)+'" data-ref-seg="'+esc(s.ref_seg)+'" data-topo="'+esc(c.topo)+'" style="padding:3px 9px;font-size:10px;border-radius:6px;border:1px solid var(--acc);background:var(--al);color:var(--acc);cursor:pointer;font-family:inherit;white-space:nowrap">'
-                +(mfCount>0?'📊 '+mfCount+' mesure'+(mfCount>1?'s':''):'📡 Déclarer')
+                +(mfCount>0?'📊 '+mfCount+' · + mesure':'📡 Déclarer')
                 +'</button>'
                 +'</td>'
                 +'</tr>';
@@ -2530,7 +2535,16 @@ function renderCPMDetail(topo){
       arrow.style.transform=open?'rotate(90deg)':'rotate(0deg)';
     });
   });
-  document.querySelectorAll('[data-cpmsubtab]').forEach(btn=>btn.addEventListener('click',()=>{S.cpmTab=btn.dataset.cpmsubtab;renderCPMDetail(topo);}));
+  document.querySelectorAll('[data-cpmsubtab]').forEach(btn=>btn.addEventListener('click',async()=>{
+    S.cpmTab=btn.dataset.cpmsubtab;
+    // Précharger les mesures fibre si on va sur l'onglet Segments
+    if(S.cpmTab==='segments'){
+      const segs=(c.segments||[]).filter(s=>s.type&&s.type.startsWith('CPM_'));
+      const allFibres=segs.flatMap(s=>s.fibres||[]);
+      await Promise.all(allFibres.map(f=>loadMesuresFibre(f.ref_fibre)));
+    }
+    renderCPMDetail(topo);
+  }));
 
   // Debrief buttons on fibre rows
   document.querySelectorAll('.btn-debrief').forEach(btn=>{
