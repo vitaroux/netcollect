@@ -167,6 +167,23 @@ async function initDB() {
       body TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_history_eid ON history(entity_id);
+    CREATE TABLE IF NOT EXISTS mesures_fibre (
+      id SERIAL PRIMARY KEY,
+      ref_fibre TEXT NOT NULL,
+      ref_segment TEXT DEFAULT '',
+      topo TEXT DEFAULT '',
+      resultat TEXT DEFAULT '',
+      lien_conforme TEXT DEFAULT '',
+      att_1310 REAL,
+      att_1550 REAL,
+      longueur_fo REAL,
+      type_defaut TEXT DEFAULT '',
+      detail TEXT DEFAULT '',
+      raison_non_fait TEXT DEFAULT '',
+      raison_autre TEXT DEFAULT '',
+      user_nom TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
     CREATE INDEX IF NOT EXISTS idx_comments_topo ON comments(topo);
   `);
   // Ajouter password_hash si absent (migration)
