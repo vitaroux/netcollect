@@ -619,7 +619,22 @@ app.post('/api/import/cpm', requireAuth, upload.single('file'), async (req,res) 
     const synth=cpmRaw[1]||[];
     const topo=clean(synth[1]),ref_commande=clean(synth[2]),date_crmad=synth[3]?clean(String(synth[3])).slice(0,10):'';
     if(!topo)return res.status(400).json({error:'Topologie introuvable (B2)'});
-    const segments=[];for(let i=5;i<cpmRaw.length;i++){const r=cpmRaw[i];if(!r[1]||r[1]==='Reference Regroupement')continue;segments.push({ref_seg:clean(r[4]),sous_ref:clean(r[2]),date_mesc:clean(r[3])?clean(String(r[3])).slice(0,10):'',type:clean(r[5]),gtr:clean(r[6]),longueur:parseInt(r[7])||0,ext_a:clean(r[10]),ext_b:clean(r[12])});}
+    const segments=[];const fibresBySeg={};let inFibres=false;
+    for(let i=5;i<cpmRaw.length;i++){
+      const r=cpmRaw[i];
+      if(!r[1])continue;
+      if(r[5]==='Référence Fibre'||r[5]==='Reference Fibre'){inFibres=true;continue;}
+      if(!inFibres){
+        if(r[1]==='Reference Regroupement')continue;
+        segments.push({ref_seg:clean(r[4]),sous_ref:clean(r[2]),date_mesc:clean(r[3])?clean(String(r[3])).slice(0,10):'',type:clean(r[5]),gtr:clean(r[6]),longueur:parseInt(r[7])||0,ext_a:clean(r[10]),ext_b:clean(r[12])});
+      } else {
+        const rs=clean(r[4]),rf=clean(r[5]);
+        if(!rs||!rf)continue;
+        if(!fibresBySeg[rs])fibresBySeg[rs]=[];
+        fibresBySeg[rs].push({ref_fibre:rf,code_a:clean(r[6]),type_a:clean(r[7]),pdl_a:clean(r[9]),pdl_b:clean(r[11]),code_b:clean(r[12]),type_b:clean(r[13])});
+      }
+    }
+    segments.forEach(s=>{s.fibres=fibresBySeg[s.ref_seg]||[];});
     const segsCPM=segments.filter(s=>s.type&&s.type.startsWith('CPM_'));
     const longueur=segsCPM.reduce((a,s)=>a+s.longueur,0);
     const sites=[];const rec=wb.Sheets['RecapMAD'];if(rec){const rr=XLSX.utils.sheet_to_json(rec,{header:1,defval:null});for(let i=1;i<rr.length;i++){const code=clean(rr[i][0]),fo=parseInt(rr[i][1])||0;if(code&&!code.includes('BPU')&&fo>0)sites.push({code,nb_fo:fo});}}
