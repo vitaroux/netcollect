@@ -1195,6 +1195,287 @@ function pageIA(){
 // ═══════════════════════════════════════════════
 // SIDEBAR + AUTH
 // ═══════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════
+// MODAL DÉBRIEF MESURE FIBRE
+// ═══════════════════════════════════════════════
+
+// Cache des mesures par ref_fibre : { ref_fibre: [...mesures] }
+const MesuresCache = {};
+
+async function loadMesuresFibre(ref_fibre){
+  try {
+    const data = await api.get('/api/mesures-fibre?ref_fibre='+encodeURIComponent(ref_fibre));
+    MesuresCache[ref_fibre] = data;
+    return data;
+  } catch(e){ return []; }
+}
+
+function ouvrirDebrief(ref_fibre, ref_segment, topo){
+  const mo = document.getElementById('mo-overlay');
+  mo.className = 'open';
+
+  // State du formulaire
+  const form = {
+    ref_fibre, ref_segment, topo,
+    step: 'resultat', // resultat → conforme | non_fait
+    resultat: null, lien_conforme: null,
+    att_1310: '', att_1550: '', longueur_fo: '',
+    type_defaut: null, detail: '',
+    raison_non_fait: null, raison_autre: '',
+  };
+
+  function render(){
+    const mesures = MesuresCache[ref_fibre] || [];
+    const derniere = mesures[0];
+    const lastOk = derniere?.lien_conforme === 'Oui';
+    const lastNok = derniere?.lien_conforme === 'Non';
+    const lastNonFait = derniere?.resultat === 'Non Fait';
+
+    mo.innerHTML = `<div class="modal" style="max-width:620px;max-height:90vh;overflow-y:auto">
+      <div class="modal-hdr">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#fff">📡 Déclarer une mesure reflecto</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px">
+            Réf. fibre : <span style="font-family:monospace">${esc(ref_fibre)}</span>
+          </div>
+        </div>
+        <button id="closeDebrief" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div class="modal-body">
+
+        ${mesures.length ? `
+        <!-- Historique compact -->
+        <div style="margin-bottom:16px;padding:10px 14px;background:var(--th);border-radius:10px;border:1px solid var(--brd)">
+          <div style="font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+            ${mesures.length} mesure(s) précédente(s)
+          </div>
+          ${mesures.slice(0,5).map((m,i)=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;${i<mesures.length-1?'border-bottom:1px solid var(--brd)':''}">
+            <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${m.lien_conforme==='Oui'?'#10b981':m.resultat==='Non Fait'?'#94a3b8':'#ef4444'}"></div>
+            <div style="flex:1">
+              <span style="font-size:12px;font-weight:600;color:var(--text)">${esc(m.resultat||'–')}</span>
+              ${m.lien_conforme?`<span style="font-size:11px;color:var(--sub)"> · Lien ${esc(m.lien_conforme)}</span>`:''}
+              ${m.type_defaut?`<span style="font-size:11px;color:#ef4444"> · ${esc(m.type_defaut)}</span>`:''}
+              ${m.raison_non_fait?`<span style="font-size:11px;color:#94a3b8"> · ${esc(m.raison_non_fait)}</span>`:''}
+            </div>
+            <div style="font-size:10px;color:var(--mut)">${m.user_nom||''} · ${m.created_at?new Date(m.created_at).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):''}</div>
+            <button data-del-mf="${m.id}" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;opacity:.6" title="Supprimer">🗑</button>
+          </div>`).join('')}
+        </div>` : ''}
+
+        <!-- Formulaire débrief -->
+        <div id="debriefForm">
+          ${renderDebriefStep(form)}
+        </div>
+
+      </div>
+    </div>`;
+
+    document.getElementById('closeDebrief').onclick = () => mo.className='';
+    mo.onclick = e => { if(e.target===mo) mo.className=''; };
+
+    // Supprimer une mesure
+    mo.querySelectorAll('[data-del-mf]').forEach(btn=>{
+      btn.addEventListener('click', async()=>{
+        if(!confirm('Supprimer cette mesure ?')) return;
+        try{
+          await api.delete('/api/mesures-fibre/'+btn.dataset.delMf);
+          await loadMesuresFibre(ref_fibre);
+          render();
+        }catch(e){notify(e.message,'error');}
+      });
+    });
+
+    // Boutons choix
+    mo.querySelectorAll('[data-debrief-choice]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const [key,val] = btn.dataset.debriefChoice.split(':');
+        form[key] = val;
+        // Navigation dans l'arbre
+        if(key==='resultat'){
+          form.step = val==='Fait' ? 'conforme' : 'non_fait';
+        } else if(key==='lien_conforme'){
+          form.step = val==='Oui' ? 'mesures_ok' : 'type_defaut';
+        } else if(key==='type_defaut'){
+          form.step = 'detail_defaut';
+        } else if(key==='raison_non_fait'){
+          form.step = val==='Autre' ? 'raison_autre' : 'confirm_non_fait';
+        }
+        document.getElementById('debriefForm').innerHTML = renderDebriefStep(form);
+        rebindDebrief(form, ref_fibre, ref_segment, topo);
+      });
+    });
+
+    rebindDebrief(form, ref_fibre, ref_segment, topo);
+  }
+
+  loadMesuresFibre(ref_fibre).then(render);
+}
+
+function renderDebriefStep(form){
+  const btnChoice = (key,val,label,color='var(--acc)') =>
+    `<button data-debrief-choice="${key}:${val}" style="padding:10px 20px;border-radius:9px;border:2px solid ${form[key]===val?color:'var(--brd)'};background:${form[key]===val?color+'18':'var(--th)'};color:${form[key]===val?color:'var(--text)'};cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:all .15s">${label}</button>`;
+
+  let html = '';
+
+  // Étape 1 : Résultat
+  html += `<div style="margin-bottom:18px">
+    <div style="font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">#190 Résultat</div>
+    <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px">La mesure a-t-elle été réalisée ?</div>
+    <div style="display:flex;gap:10px">
+      ${btnChoice('resultat','Fait','✓ Fait','#10b981')}
+      ${btnChoice('resultat','Non Fait','✗ Non Fait','#94a3b8')}
+    </div>
+  </div>`;
+
+  if(!form.resultat) return html;
+
+  if(form.resultat === 'Non Fait'){
+    html += `<div style="margin-bottom:18px">
+      <div style="font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">#1932 Raison non fait</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px">Pourquoi la mesure n'a pas pu être réalisée ?</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${['Accès site NOK','Accès salle mesure NOK','MAD NOK','Autre'].map(r=>btnChoice('raison_non_fait',r,r,'#94a3b8')).join('')}
+      </div>
+    </div>`;
+    if(form.raison_non_fait === 'Autre'){
+      html += `<div style="margin-bottom:18px">
+        <div style="font-size:12px;color:var(--mut);margin-bottom:6px">Préciser</div>
+        <textarea id="db_raison_autre" rows="2" style="width:100%;resize:vertical" placeholder="Expliquer la raison...">${esc(form.raison_autre||'')}</textarea>
+      </div>`;
+    }
+    if(form.raison_non_fait){
+      html += `<button id="submitDebrief" class="btn primary" style="width:100%;margin-top:4px">✓ Enregistrer la mesure</button>`;
+    }
+    return html;
+  }
+
+  // Fait → Lien conforme ?
+  html += `<div style="margin-bottom:18px">
+    <div style="font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">#1930 Lien conforme ?</div>
+    <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px">Le lien est-il conforme ?</div>
+    <div style="display:flex;gap:10px">
+      ${btnChoice('lien_conforme','Oui','✓ Oui','#10b981')}
+      ${btnChoice('lien_conforme','Non','✗ Non','#ef4444')}
+    </div>
+  </div>`;
+
+  if(!form.lien_conforme) return html;
+
+  if(form.lien_conforme === 'Oui'){
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px">
+      <div>
+        <div style="font-size:12px;color:var(--mut);margin-bottom:5px">#614 Atténuation 1310 (dB)</div>
+        <input id="db_att1310" type="number" step="0.01" value="${form.att_1310||''}" style="width:100%" placeholder="ex: 1.25">
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--mut);margin-bottom:5px">#615 Atténuation 1550 (dB)</div>
+        <input id="db_att1550" type="number" step="0.01" value="${form.att_1550||''}" style="width:100%" placeholder="ex: 0.98">
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--mut);margin-bottom:5px">#613 Longueur lien FO (m)</div>
+        <input id="db_longueur" type="number" step="1" value="${form.longueur_fo||''}" style="width:100%" placeholder="ex: 15829">
+      </div>
+    </div>
+    <button id="submitDebrief" class="btn primary" style="width:100%">✓ Enregistrer la mesure</button>`;
+    return html;
+  }
+
+  // Lien NON conforme → Type de défaut
+  html += `<div style="margin-bottom:18px">
+    <div style="font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">#1931 Type de défaut</div>
+    <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px">Quel est le type de défaut ?</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${['Continuité NOK','Réflectance','Contrainte','Soudure NOK','Perte NOK','CR MAD NOK'].map(t=>btnChoice('type_defaut',t,t,'#ef4444')).join('')}
+    </div>
+  </div>`;
+
+  if(!form.type_defaut) return html;
+
+  // Champ détail selon le type
+  const detailConfig = {
+    'Continuité NOK':  {label:'Distance mesurée (m)', placeholder:'ex: 8450', type:'number'},
+    'Réflectance':     {label:'Valeur relevée (dB)', placeholder:'ex: -45.2', type:'number'},
+    'Contrainte':      {label:'Distance où se trouve la contrainte (m) + perte relevée (dB)', placeholder:'ex: 4200m, perte 0.8dB', type:'text'},
+    'Soudure NOK':     {label:'Distance de la soudure (m) + perte relevée (dB)', placeholder:'ex: 3100m, perte 0.5dB', type:'text'},
+    'Perte NOK':       {label:'Distance de la perte (m) + perte relevée (dB)', placeholder:'ex: 5600m, perte 1.2dB', type:'text'},
+    'CR MAD NOK':      {label:'Description (inversion, autre...)', placeholder:'Décrire ce qui ne correspond pas au CR MAD', type:'textarea'},
+  };
+  const dc = detailConfig[form.type_defaut];
+  if(dc){
+    html += `<div style="margin-bottom:18px">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:6px">${esc(dc.label)}</div>
+      ${dc.type==='textarea'
+        ? `<textarea id="db_detail" rows="3" style="width:100%;resize:vertical" placeholder="${esc(dc.placeholder)}">${esc(form.detail||'')}</textarea>`
+        : `<input id="db_detail" type="${dc.type}" value="${esc(form.detail||'')}" style="width:100%" placeholder="${esc(dc.placeholder)}">`
+      }
+    </div>
+    <button id="submitDebrief" class="btn" style="width:100%;background:#ef4444;color:#fff;border-color:#ef4444">✓ Enregistrer (mesure NOK)</button>`;
+  }
+
+  return html;
+}
+
+function rebindDebrief(form, ref_fibre, ref_segment, topo){
+  // Inputs
+  const i1310 = document.getElementById('db_att1310');
+  const i1550 = document.getElementById('db_att1550');
+  const ilong  = document.getElementById('db_longueur');
+  const idet   = document.getElementById('db_detail');
+  const irais  = document.getElementById('db_raison_autre');
+  if(i1310) i1310.oninput = ()=>{ form.att_1310=i1310.value; };
+  if(i1550) i1550.oninput = ()=>{ form.att_1550=i1550.value; };
+  if(ilong) ilong.oninput = ()=>{ form.longueur_fo=ilong.value; };
+  if(idet)  idet.oninput  = ()=>{ form.detail=idet.value; };
+  if(irais) irais.oninput = ()=>{ form.raison_autre=irais.value; };
+
+  // Submit
+  const submitBtn = document.getElementById('submitDebrief');
+  if(submitBtn){
+    submitBtn.onclick = async()=>{
+      if(form.raison_autre) form.raison_autre = document.getElementById('db_raison_autre')?.value||'';
+      if(form.att_1310!==undefined) form.att_1310 = parseFloat(document.getElementById('db_att1310')?.value)||null;
+      if(form.att_1550!==undefined) form.att_1550 = parseFloat(document.getElementById('db_att1550')?.value)||null;
+      if(form.longueur_fo!==undefined) form.longueur_fo = parseFloat(document.getElementById('db_longueur')?.value)||null;
+      if(form.detail!==undefined) form.detail = document.getElementById('db_detail')?.value||'';
+      try{
+        submitBtn.disabled=true; submitBtn.textContent='Enregistrement...';
+        await api.post('/api/mesures-fibre', {
+          ref_fibre, ref_segment, topo,
+          resultat: form.resultat,
+          lien_conforme: form.lien_conforme||'',
+          att_1310: form.att_1310,
+          att_1550: form.att_1550,
+          longueur_fo: form.longueur_fo,
+          type_defaut: form.type_defaut||'',
+          detail: form.detail||'',
+          raison_non_fait: form.raison_non_fait||'',
+          raison_autre: form.raison_autre||'',
+          user_nom: S.currentUser ? S.currentUser.prenom+' '+S.currentUser.nom : 'Inconnu',
+        });
+        notify('Mesure enregistrée ✓', 'success');
+        await loadMesuresFibre(ref_fibre);
+        // Reset form for potential new measure
+        form.resultat=null; form.lien_conforme=null; form.step='resultat';
+        form.att_1310=''; form.att_1550=''; form.longueur_fo='';
+        form.type_defaut=null; form.detail='';
+        form.raison_non_fait=null; form.raison_autre='';
+        document.getElementById('debriefForm').innerHTML = renderDebriefStep(form);
+        // Refresh historique
+        const mo=document.getElementById('mo-overlay');
+        const prevHistorique = mo.querySelector('.modal-body > div:first-child');
+        const mesures = MesuresCache[ref_fibre]||[];
+        // Re-render full modal
+        const btn = mo.querySelector('[id^="closeDebrief"]');
+        const ref_s = btn?ref_segment:''; // keep refs alive
+        const closeBtn = document.getElementById('closeDebrief');
+        if(closeBtn){ closeBtn.click(); setTimeout(()=>ouvrirDebrief(ref_fibre,ref_segment,topo),50); }
+      }catch(e){ notify('Erreur: '+e.message,'error'); if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='✓ Enregistrer';} }
+    };
+  }
+}
+
 function renderSidebar(){
   const nav=getNav();
   const grps=[...new Set(nav.map(n=>n.g))];
@@ -2137,13 +2418,30 @@ function renderCPMDetail(topo){
               +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">PDL B</th>'
               +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site B</th>'
               +'</tr></thead><tbody>'
-              +fibres.map(function(f,fi){return '<tr style="background:'+(fi%2?'transparent':'rgba(124,58,237,.03)')+'">'
-                +'<td style="padding:3px 6px"><span class="mono" style="font-size:10px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span></td>'
+              +fibres.map(function(f,fi){
+              const mfCount=(MesuresCache[f.ref_fibre]||[]).length;
+              const lastMf=(MesuresCache[f.ref_fibre]||[])[0];
+              const mfOk=lastMf&&lastMf.lien_conforme==='Oui';
+              const mfNok=lastMf&&(lastMf.lien_conforme==='Non');
+              const mfNf=lastMf&&lastMf.resultat==='Non Fait';
+              const statusDot=mfOk?'#10b981':mfNok?'#ef4444':mfNf?'#94a3b8':'#334155';
+              const statusTitle=mfOk?'OK':mfNok?'NOK':mfNf?'Non Fait':'Aucune mesure';
+              return '<tr style="background:'+(fi%2?'transparent':'rgba(124,58,237,.03)')+'">'
+                +'<td style="padding:3px 6px"><div style="display:flex;align-items:center;gap:5px">'
+                +'<div title="'+statusTitle+'" style="width:7px;height:7px;border-radius:50%;background:'+statusDot+';flex-shrink:0"></div>'
+                +'<span class="mono" style="font-size:10px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span>'
+                +'</div></td>'
                 +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_a||'')+'</span></td>'
                 +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_a||'')+'</td>'
                 +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_b||'')+'</td>'
                 +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_b||'')+'</span></td>'
-                +'</tr>';}).join('')
+                +'<td style="padding:3px 6px;text-align:right">'
+                +'<button class="btn-debrief" data-ref-fibre="'+esc(f.ref_fibre)+'" data-ref-seg="'+esc(s.ref_seg)+'" data-topo="'+esc(c.topo)+'" style="padding:3px 9px;font-size:10px;border-radius:6px;border:1px solid var(--acc);background:var(--al);color:var(--acc);cursor:pointer;font-family:inherit;white-space:nowrap">'
+                +(mfCount>0?'📊 '+mfCount+' mesure'+(mfCount>1?'s':''):'📡 Déclarer')
+                +'</button>'
+                +'</td>'
+                +'</tr>';
+            }).join('')
               +'</tbody></table>'
               +'</div>'
               +'</div>'
@@ -2236,6 +2534,13 @@ function renderCPMDetail(topo){
     });
   });
   document.querySelectorAll('[data-cpmsubtab]').forEach(btn=>btn.addEventListener('click',()=>{S.cpmTab=btn.dataset.cpmsubtab;renderCPMDetail(topo);}));
+
+  // Debrief buttons on fibre rows
+  document.querySelectorAll('.btn-debrief').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      ouvrirDebrief(btn.dataset.refFibre, btn.dataset.refSeg, btn.dataset.topo);
+    });
+  });
   document.getElementById('saveCPMBtn')?.addEventListener('click',async()=>{
     const statut=document.getElementById('cpmStatutSel')?.value;
     const commentaire=document.getElementById('cpmCommentTA')?.value||'';
