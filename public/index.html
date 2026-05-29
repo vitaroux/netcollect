@@ -403,55 +403,9 @@ function notify(msg, type='success'){
   setTimeout(()=>n.remove(),3000);
 }
 
-function destroyCharts(){Object.values(S.charts).forEach(c=>{try{c.destroy();}catch(e){}});S.charts={};}
-
-// ── SIDEBAR ──────────────────────────────────────
-
-// ═══════════════════════════════════════════════
-// AUTH FUNCTIONS
-// ═══════════════════════════════════════════════
-function showLogin(){
-  document.getElementById('login-screen').classList.add('visible');
-  document.getElementById('app') && (document.getElementById('app').style.display='none');
-  // Bind events
-  const btn = document.getElementById('loginBtn');
-  const emailEl = document.getElementById('loginEmail');
-  const passEl  = document.getElementById('loginPassword');
-  const errEl   = document.getElementById('loginError');
-  // Reset état du bouton (peut être disabled après une connexion précédente)
-  btn.textContent = 'Se connecter';
-  btn.disabled = false;
-  errEl.style.display = 'none';
-  emailEl.value = '';
-  passEl.value = '';
-
-  async function doLogin(){
-    const email    = emailEl.value.trim();
-    const password = passEl.value;
-    if(!email||!password){ errEl.textContent='Veuillez remplir tous les champs'; errEl.style.display=''; return; }
-    btn.textContent='Connexion...'; btn.disabled=true;
-    errEl.style.display='none';
-    try{
-      const r = await fetch('/api/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
-      const data = await r.json();
-      if(!r.ok){ errEl.textContent=data.error||'Erreur de connexion'; errEl.style.display=''; btn.textContent='Se connecter'; btn.disabled=false; return; }
-      // Connexion réussie
-      S.currentUser = data.user;
-      S.userName    = data.user.prenom+' '+data.user.nom;
-      document.getElementById('login-screen').classList.remove('visible');
-      await loadAll();
-      renderSidebar();
-      renderMain();
-    }catch(e){
-      errEl.textContent='Erreur serveur: '+e.message; errEl.style.display='';
-      btn.textContent='Se connecter'; btn.disabled=false;
-    }
-  }
-
-  btn.onclick = doLogin;
-  passEl.onkeydown = e => { if(e.key==='Enter') doLogin(); };
-  emailEl.onkeydown = e => { if(e.key==='Enter') passEl.focus(); };
-  setTimeout(()=>emailEl.focus(), 100);
+function destroyCharts(){
+  Object.keys(S.charts||{}).forEach(k=>{ try{ S.charts[k]?.destroy(); }catch(e){} delete S.charts[k]; });
+  S.charts = {};
 }
 
 async function doLogout(){
@@ -2481,13 +2435,23 @@ function initCharts(){
 const PAGES={prod:pageProd,kpi:pageKPI,ia:pageIA,bus:pageBUS,delivery:pageDelivery,travaux:pageTravaux,mesures:pageMesures,cdd:pageCDD,empl:pageEmpl,cpm:pageCPM,users:pageUsers,import:pageImport,settings:pageSettings};
 
 function renderMain(){
-  document.getElementById('main').innerHTML=(PAGES[S.page]||pageProd)();
-  setTimeout(()=>{ initCharts(); bindPageEvents(); }, 10);
+  const main = document.getElementById('main');
+  // Render HTML synchronously
+  main.innerHTML = (PAGES[S.page]||pageProd)();
+  // Bind events immediately (no charts yet)
+  bindPageEvents();
+  // Init charts only on pages that need them (deferred to next frame)
+  const chartPages = ['prod','kpi'];
+  if(chartPages.includes(S.page)){
+    requestAnimationFrame(()=>{ initCharts(); });
+  }
 }
 
-async function navigate(page){
-  S.page=page; S.pg=0;
-  renderSidebar(); renderMain();
+function navigate(page){
+  if(S.page === page) return; // éviter le re-render inutile
+  S.page = page; S.pg = 0;
+  renderSidebar();
+  renderMain();
 }
 
 function filterBus(){
