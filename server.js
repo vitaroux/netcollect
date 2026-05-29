@@ -261,7 +261,15 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/users', requireAuth, async (req,res) => {
   try {
     if (USE_PG) {
-      const {rows} = await pool.query('SELECT id,nom,prenom,email,profil,actif,last_login,last_seen,created_at,updated_at FROM users ORDER BY nom,prenom');
+      // Fallback si colonnes last_login/last_seen pas encore migrées
+      let rows;
+      try {
+        const r = await pool.query('SELECT id,nom,prenom,email,profil,actif,last_login,last_seen,created_at,updated_at FROM users ORDER BY nom,prenom');
+        rows = r.rows;
+      } catch(e) {
+        const r = await pool.query('SELECT id,nom,prenom,email,profil,actif,created_at,updated_at FROM users ORDER BY nom,prenom');
+        rows = r.rows;
+      }
       return res.json(rows);
     }
     res.json(loadJ('users').map(u=>({...u,password_hash:undefined})).sort((a,b)=>a.nom.localeCompare(b.nom)));
