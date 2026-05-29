@@ -976,6 +976,58 @@ INSTRUCTIONS :
   }
 });
 
+
+// ═══════════════════════════════════════════════
+// MESURES FIBRE (débrief reflecto)
+// ═══════════════════════════════════════════════
+app.get('/api/mesures-fibre', requireAuth, async (req,res)=>{
+  try {
+    const {ref_fibre} = req.query;
+    if(USE_PG){
+      const q = ref_fibre
+        ? 'SELECT * FROM mesures_fibre WHERE ref_fibre=$1 ORDER BY created_at DESC'
+        : 'SELECT * FROM mesures_fibre ORDER BY created_at DESC';
+      const {rows} = await pool.query(q, ref_fibre?[ref_fibre]:[]);
+      return res.json(rows);
+    }
+    const db = loadJ('mesures_fibre');
+    const data = ref_fibre ? db.filter(m=>m.ref_fibre===ref_fibre) : db;
+    res.json(data.sort((a,b)=>b.created_at?.localeCompare(a.created_at||'')));
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+app.post('/api/mesures-fibre', requireAuth, async (req,res)=>{
+  try {
+    const f = req.body;
+    if(!f.ref_fibre) return res.status(400).json({error:'ref_fibre obligatoire'});
+    if(USE_PG){
+      const {rows} = await pool.query(
+        `INSERT INTO mesures_fibre(ref_fibre,ref_segment,topo,resultat,lien_conforme,att_1310,att_1550,longueur_fo,type_defaut,detail,raison_non_fait,raison_autre,user_nom)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [f.ref_fibre,f.ref_segment||'',f.topo||'',f.resultat||'',f.lien_conforme||'',
+         f.att_1310||null,f.att_1550||null,f.longueur_fo||null,
+         f.type_defaut||'',f.detail||'',f.raison_non_fait||'',f.raison_autre||'',f.user_nom||'']
+      );
+      return res.status(201).json(rows[0]);
+    }
+    const db = loadJ('mesures_fibre');
+    const row = {id:Date.now(),...f,created_at:now()};
+    db.push(row); saveJ('mesures_fibre',db);
+    res.status(201).json(row);
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
+app.delete('/api/mesures-fibre/:id', requireAuth, async (req,res)=>{
+  try {
+    if(USE_PG){
+      await pool.query('DELETE FROM mesures_fibre WHERE id=$1',[req.params.id]);
+      return res.json({ok:true});
+    }
+    const db = loadJ('mesures_fibre').filter(m=>String(m.id)!==req.params.id);
+    saveJ('mesures_fibre',db); res.json({ok:true});
+  } catch(e){res.status(500).json({error:e.message});}
+});
+
 // ── SETUP & HEALTH ────────────────────────────────
 app.get('/api/setup', async (req,res) => {
   if (!USE_PG) return res.json({status:'ok',mode:'json',message:'Mode JSON, pas de setup requis'});
