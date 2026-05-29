@@ -95,8 +95,14 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50*
 
 // ── AUTH MIDDLEWARE ───────────────────────────────
 function requireAuth(req, res, next) {
-  if (req.session?.userId) return next();
-  res.status(401).json({ error: 'Non authentifié', redirect: '/login' });
+  if (!req.session?.userId) return res.status(401).json({ error: 'Non authentifié', redirect: '/login' });
+  // Update last_seen async (non-blocking)
+  if(USE_PG){
+    pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[req.session.userId]).catch(()=>{});
+  } else {
+    try{const db=loadJ('users');const i=db.findIndex(u=>u.id===req.session.userId);if(i>=0){db[i].last_seen=now();saveJ('users',db);}}catch(e){}
+  }
+  next();
 }
 
 // ── DB SCHEMA INIT ────────────────────────────────
@@ -233,6 +239,9 @@ app.post('/api/auth/login', async (req, res) => {
     // Créer la session
     const sessionUser = { id: user.id, nom: user.nom, prenom: user.prenom, email: user.email, profil: user.profil };
     req.session.userId = user.id;
+    // Update last_login
+    if(USE_PG){ pool.query('UPDATE users SET last_login=NOW(), last_seen=NOW() WHERE id=$1',[user.id]).catch(()=>{}); }
+    else { try{const db=loadJ('users');const i=db.findIndex(u=>u.id===user.id);if(i>=0){db[i].last_login=now();db[i].last_seen=now();saveJ('users',db);}}catch(e){} }
     req.session.user   = sessionUser;
 
     res.json({ ok: true, user: sessionUser });
@@ -252,7 +261,7 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/users', requireAuth, async (req,res) => {
   try {
     if (USE_PG) {
-      const {rows} = await pool.query('SELECT id,nom,prenom,email,profil,actif,created_at,updated_at FROM users ORDER BY nom,prenom');
+      const {rows} = await pool.query('SELECT id,nom,prenom,email,profil,actif,last_login,last_seen,created_at,updated_at FROM users ORDER BY nom,prenom');
       return res.json(rows);
     }
     res.json(loadJ('users').map(u=>({...u,password_hash:undefined})).sort((a,b)=>a.nom.localeCompare(b.nom)));
