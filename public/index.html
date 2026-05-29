@@ -2105,19 +2105,45 @@ function renderCPMDetail(topo){
     tabContent='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
       +Object.entries(typeColors).map(function(e2){const n=segs.filter(function(s){return s.type===e2[0];}).length;return n?'<span class="badge" style="background:'+e2[1]+'18;color:'+e2[1]+';cursor:pointer">'+esc(e2[0])+' ('+n+')</span>':'';}).join('')
       +'</div>'
-      +'<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table>'
-      +'<thead><tr><th>Réf. segment</th><th>Sous-ref</th><th>Type</th><th>Date MESC</th><th>GTR</th><th>Long. (m)</th><th>Ext. A</th><th>Ext. B</th></tr></thead>'
-      +'<tbody>'+segs.map(function(s,i){return '<tr class="'+(i%2?'odd':'even')+'">'
-        +'<td><span class="mono" style="font-size:11px;color:var(--sub)">'+esc((s.ref_seg||'').slice(0,22))+'</span></td>'
-        +'<td style="font-size:12px;color:var(--sub)">'+esc(s.sous_ref||'')+'</td>'
-        +'<td><span class="badge" style="background:'+(typeColors[s.type]||'#888')+'18;color:'+(typeColors[s.type]||'#888')+';font-size:11px">'+esc(s.type||'')+'</span></td>'
-        +'<td style="font-size:12px;color:var(--sub)">'+esc(s.date_mesc||'')+'</td>'
-        +'<td style="font-size:12px;color:var(--sub)">'+esc(s.gtr||'')+'</td>'
-        +'<td style="font-weight:600;text-align:right">'+((s.longueur||0).toLocaleString('fr-FR'))+'</td>'
-        +'<td><span class="mono" style="font-weight:600;color:var(--acc)">'+esc(s.ext_a||'')+'</span></td>'
-        +'<td><span class="mono" style="font-weight:600;color:var(--acc)">'+esc(s.ext_b||'')+'</span></td>'
-        +'</tr>';}).join('')
-      +'</tbody></table></div>';
+      +'<div style="overflow-x:auto;max-height:65vh;overflow-y:auto">'
+      +segs.map(function(s,i){
+        const fibres=s.fibres||[];
+        const rowBg=i%2?'var(--th)':'var(--card)';
+        const tc=typeColors[s.type]||'#888';
+        return '<div style="border:1px solid var(--brd);border-radius:8px;margin-bottom:8px;overflow:hidden">'
+          // Segment header row
+          +'<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 80px 100px 100px;gap:8px;padding:8px 12px;background:'+rowBg+';align-items:center">'
+          +'<div><span class="mono" style="font-size:11px;color:var(--sub)">'+esc((s.ref_seg||'').slice(0,24))+'</span></div>'
+          +'<div><span class="badge" style="background:'+tc+'18;color:'+tc+';font-size:10px">'+esc(s.type||'')+'</span></div>'
+          +'<div style="font-size:11px;color:var(--sub)">'+esc(s.date_mesc||'')+'</div>'
+          +'<div style="font-size:11px;color:var(--sub)">'+esc(s.gtr||'')+'</div>'
+          +'<div style="font-weight:700;text-align:right;font-size:13px">'+((s.longueur||0).toLocaleString('fr-FR'))+'<span style="font-size:9px;color:var(--mut)"> m</span></div>'
+          +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:11px">'+esc(s.ext_a||'')+'</span></div>'
+          +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:11px">'+esc(s.ext_b||'')+'</span></div>'
+          +'</div>'
+          // Fibres sub-table
+          +(fibres.length?'<div style="background:var(--inp);border-top:1px solid var(--brd);padding:4px 12px 6px">'
+            +'<div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'+fibres.length+' référence(s) fibre</div>'
+            +'<table style="width:100%;font-size:11px">'
+            +'<thead><tr>'
+            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Réf. fibre</th>'
+            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site A</th>'
+            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">PDL A</th>'
+            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">PDL B</th>'
+            +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:500">Site B</th>'
+            +'</tr></thead><tbody>'
+            +fibres.map(function(f,fi){return '<tr style="background:'+(fi%2?'transparent':'rgba(124,58,237,.03)')+'">'
+              +'<td style="padding:3px 6px"><span class="mono" style="font-size:10px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span></td>'
+              +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_a||'')+'</span></td>'
+              +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_a||'')+'</td>'
+              +'<td style="padding:3px 6px;font-family:monospace;color:var(--text)">'+esc(f.pdl_b||'')+'</td>'
+              +'<td style="padding:3px 6px"><span class="mono" style="color:var(--acc);font-weight:600">'+esc(f.code_b||'')+'</span></td>'
+              +'</tr>';}).join('')
+            +'</tbody></table></div>'
+          :'<div style="padding:4px 12px;font-size:10px;color:var(--mut)">Aucune référence fibre</div>')
+          +'</div>';
+      }).join('')
+      +'</div>';
   } else if(activeTab==='hepoc'){
     tabContent='<div style="overflow-x:auto"><table>'
       +'<thead><tr><th>Code site</th><th>Nom</th><th>CP</th><th>Type</th><th>Date MES</th><th>N° cmd FCI</th><th>GTI</th><th>Type accès</th><th>État baie</th></tr></thead>'
