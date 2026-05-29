@@ -1384,101 +1384,99 @@ function pageKPI(){
   const nokT=S.mesures.reduce((a,m)=>a+(m.nok||0),0);
   const lots=(byLot||[]);
 
-  return `<div class="page" style="padding:16px 20px">
-
-    <!-- Titre -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div><div class="page-title" style="font-size:17px">Dashboard KPI</div>
-        <div class="page-sub">Vue management · Indicateurs de performance</div></div>
-    </div>
+  return `<div class="page" style="padding:18px 24px;display:flex;flex-direction:column;gap:14px;min-height:calc(100vh - 60px)">
 
     <!-- Ligne 1 : 4 KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;flex-shrink:0">
       ${[
         ['Taux livraison', Math.round(livres/total*100)+'%', livres+'/'+total+' BUS', '#10b981', '✓'],
-        ['Taux MES', Math.round(mes/total*100)+'%', mes+' BUS', '#06b6d4', '⚡'],
-        ['Mesures OK', (okT+nokT>0?Math.round(okT/(okT+nokT)*100):0)+'%', okT+'/'+(okT+nokT)+' tronçons', '#3b82f6', '📐'],
-        ['Avancement moy.', (avGlobal||0)+'%', 'sur '+total+' BUS', '#7c3aed', '📈'],
-      ].map(([l,v,s,c,i])=>`<div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--sh)">
-        <div style="width:34px;height:34px;border-radius:9px;background:${c}20;color:${c};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${i}</div>
-        <div><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">${l}</div>
-          <div style="font-size:20px;font-weight:700;color:${c};line-height:1.1">${v}</div>
-          <div style="font-size:10px;color:var(--mut)">${s}</div></div>
+        ['Taux MES',       Math.round(mes/total*100)+'%',    mes+' BUS',              '#06b6d4', '⚡'],
+        ['Mesures OK',     (okT+nokT>0?Math.round(okT/(okT+nokT)*100):0)+'%', okT+'/'+(okT+nokT), '#3b82f6', '📐'],
+        ['Avancement moy.',(avGlobal||0)+'%',                'sur '+total+' BUS',    '#7c3aed', '📈'],
+      ].map(([l,v,s,c,i])=>`<div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;box-shadow:var(--sh)">
+        <div style="width:40px;height:40px;border-radius:10px;background:${c}20;color:${c};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${i}</div>
+        <div>
+          <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">${l}</div>
+          <div style="font-size:24px;font-weight:800;color:${c};line-height:1">${v}</div>
+          <div style="font-size:11px;color:var(--mut);margin-top:2px">${s}</div>
+        </div>
       </div>`).join('')}
     </div>
 
-    <!-- Ligne 2 : États + Par Lot + Avancement RR — hauteur fixe -->
-    <div style="display:grid;grid-template-columns:210px 1fr 1fr;gap:10px;margin-bottom:14px">
+    <!-- Ligne 2 : États + Par Lot + Avancement RR -->
+    <div style="display:grid;grid-template-columns:220px 1fr 1fr;gap:12px;flex-shrink:0">
 
-      <!-- États BUS -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">États BUS</div>
-        <div style="display:flex;justify-content:center;margin-bottom:8px">
-          <canvas id="pieChart" width="130" height="130"></canvas>
+      <!-- États BUS donut -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">États BUS</div>
+        <div style="display:flex;justify-content:center;margin-bottom:12px">
+          <canvas id="pieChart" width="150" height="150"></canvas>
         </div>
         <div>
           ${Object.entries(SC).map(([k,v])=>{
             const n=(byEtat||[]).find(r=>r.etat==k)?.count||0;
             if(!n) return '';
             const c=CC[+k%CC.length];
-            return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-              <div style="width:6px;height:6px;border-radius:1px;background:${c};flex-shrink:0"></div>
-              <span style="font-size:10px;color:var(--sub);flex:1">${v.s}</span>
-              <span style="font-size:11px;font-weight:600;color:var(--text)">${n}</span>
+            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+              <div style="width:8px;height:8px;border-radius:2px;background:${c};flex-shrink:0"></div>
+              <span style="font-size:11px;color:var(--sub);flex:1">${v.s}</span>
+              <span style="font-size:12px;font-weight:600;color:var(--text)">${n}</span>
             </div>`;
           }).join('')}
         </div>
       </div>
 
-      <!-- Par Lot — hauteur fixe 240px -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Par Lot</div>
-        <div style="height:220px;position:relative">
+      <!-- Par Lot -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Par Lot</div>
+        <div style="height:260px;position:relative">
           <canvas id="barChart"></canvas>
         </div>
       </div>
 
-      <!-- Avancement par RR — hauteur fixe 240px -->
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Avancement par RR</div>
-        <div style="height:220px;position:relative">
+      <!-- Avancement par RR -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Avancement par RR</div>
+        <div style="height:260px;position:relative">
           <canvas id="rrChart"></canvas>
         </div>
       </div>
     </div>
 
     <!-- Ligne 3 : Points d'attention + Avancement lot -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
 
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">Points d'attention</div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <!-- Points d'attention -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Points d'attention</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
           ${[
-            ['BUS risque ↑',       riskHigh||0,  '#ef4444'],
-            ['Mesures NOK',        nokCount||0,  '#f59e0b'],
-            ['SIN3 non MAJ',       sin3Nok||0,   '#f97316'],
-            ['Chantiers <20%',     S.bus.filter(b=>b.etat===4&&b.av<20).length, '#8b5cf6'],
-          ].map(([l,v,c])=>`<div style="text-align:center;padding:10px 6px;background:var(--th);border-radius:8px;border-top:3px solid ${c}">
-            <div style="font-size:22px;font-weight:700;color:${c}">${v}</div>
-            <div style="font-size:10px;color:var(--mut);margin-top:3px">${l}</div>
+            ['BUS risque ↑',   riskHigh||0, '#ef4444'],
+            ['Mesures NOK',    nokCount||0, '#f59e0b'],
+            ['SIN3 non MAJ',   sin3Nok||0,  '#f97316'],
+            ['Chantiers <20%', S.bus.filter(b=>b.etat===4&&b.av<20).length, '#8b5cf6'],
+          ].map(([l,v,c])=>`<div style="text-align:center;padding:14px 8px;background:var(--th);border-radius:10px;border-top:3px solid ${c}">
+            <div style="font-size:26px;font-weight:800;color:${c}">${v}</div>
+            <div style="font-size:10px;color:var(--mut);margin-top:4px;line-height:1.3">${l}</div>
           </div>`).join('')}
         </div>
       </div>
 
-      <div style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">Avancement livraison / lot</div>
+      <!-- Avancement livraison par lot -->
+      <div style="background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:16px;box-shadow:var(--sh)">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Avancement livraison / lot</div>
         ${lots.map(l=>{
           const pLiv=l.total?Math.round((l.livres||0)/l.total*100):0;
           const pTrx=l.total?Math.round((l.trx||0)/l.total*100):0;
           const col=pLiv>=60?'#10b981':pLiv>=30?'#f59e0b':'#ef4444';
-          return `<div style="margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <span class="lot-badge">${l.lot}</span>
-              <span style="font-size:11px;color:${col};font-weight:600">${pLiv}% livrés · ${l.livres||0}/${l.total}</span>
+          return `<div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+              <span class="lot-badge" style="font-size:12px">${l.lot}</span>
+              <span style="font-size:12px;color:${col};font-weight:600">${pLiv}% livrés · ${l.livres||0}/${l.total}</span>
             </div>
-            <div style="height:7px;background:var(--brd);border-radius:99px;overflow:hidden;display:flex">
-              <div style="width:${pLiv}%;background:#10b981"></div>
-              <div style="width:${pTrx}%;background:#f97316"></div>
+            <div style="height:8px;background:var(--brd);border-radius:99px;overflow:hidden;display:flex">
+              <div style="width:${pLiv}%;background:#10b981;transition:width .4s"></div>
+              <div style="width:${pTrx}%;background:#f97316;transition:width .4s"></div>
             </div>
           </div>`;
         }).join('')}
