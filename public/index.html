@@ -64,6 +64,12 @@ body{background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display
 .section-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px}
 
 /* ── KPI ── */
+.kpi-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi-grid-8{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:12px;margin-bottom:18px}
+.kcrd{background:var(--card);border:1px solid var(--brd);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:5px;box-shadow:var(--sh)}
+.kcrd-lbl{font-size:11px;color:var(--sub);font-weight:500;text-transform:uppercase;letter-spacing:.05em}
+.kcrd-val{font-size:28px;font-weight:700;color:var(--text);line-height:1}
+.kcrd-sub{font-size:12px;color:var(--mut)}
 .krow{background:var(--card);border:1px solid var(--brd);border-radius:14px;padding:15px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--sh)}
 .krow-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
 .kcrd{background:var(--card);border:1px solid var(--brd);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--sh)}
