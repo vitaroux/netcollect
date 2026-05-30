@@ -190,6 +190,125 @@ select option{background:var(--card)}
 .chat-send{width:38px;height:38px;border-radius:10px;background:var(--acc);border:none;color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .chat-send:hover{opacity:.88}
 .chat-send:disabled{opacity:.4;cursor:not-allowed}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE MOBILE
+   ═══════════════════════════════════════════════ */
+
+/* Hamburger button */
+#hamburger{display:none;position:fixed;top:12px;left:12px;z-index:600;
+  width:42px;height:42px;border-radius:10px;background:var(--acc);border:none;
+  color:#fff;font-size:20px;cursor:pointer;align-items:center;justify-content:center;
+  box-shadow:0 2px 12px rgba(124,58,237,.4)}
+#sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:499}
+
+@media(max-width:768px){
+  /* Layout */
+  #hamburger{display:flex}
+  #app{flex-direction:column}
+  #sidebar{
+    position:fixed;left:-240px;top:0;bottom:0;width:240px;z-index:500;
+    transition:left .25s ease;overflow-y:auto
+  }
+  #sidebar.open{left:0}
+  #sb-overlay.open{display:block}
+  #main{padding-top:60px;width:100vw;overflow-x:hidden}
+
+  /* Page padding */
+  .page{padding:12px}
+  
+  /* Page header stack on mobile */
+  .page-hdr{flex-direction:column;align-items:flex-start;gap:8px}
+  .page-hdr > div:last-child{width:100%;display:flex;flex-wrap:wrap;gap:6px}
+  .page-hdr > div:last-child .btn{flex:1;min-width:0;text-align:center;justify-content:center}
+
+  /* KPI grids → 2 cols */
+  .kpi-grid-4,.kpi-grid-8,
+  div[style*="grid-template-columns:repeat(4,1fr)"],
+  div[style*="grid-template-columns:repeat(4, 1fr)"]{
+    grid-template-columns:repeat(2,1fr)!important
+  }
+  div[style*="grid-template-columns:1fr 1fr 1fr"],
+  div[style*="grid-template-columns:repeat(3,1fr)"]{
+    grid-template-columns:1fr 1fr!important
+  }
+  div[style*="grid-template-columns:1fr 1fr"]:not(.keep-2col){
+    grid-template-columns:1fr!important
+  }
+
+  /* Tables → scrollable */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:600px;font-size:13px}
+  th,td{padding:8px 10px!important;white-space:nowrap}
+
+  /* Modals → full screen */
+  #mo-overlay .modal,
+  #userFormOverlay > div{
+    max-width:100vw!important;width:100vw!important;
+    max-height:100dvh!important;height:100dvh!important;
+    border-radius:0!important;margin:0!important
+  }
+  #mo-overlay{padding:0!important;align-items:flex-start!important}
+
+  /* Filter bar → wrap */
+  .flt-bar{flex-wrap:wrap;gap:6px}
+  .flt-bar input,.flt-bar select{width:calc(50% - 4px)!important;min-width:120px}
+
+  /* Chat panel */
+  #chatPanel{width:100vw!important;right:0!important;bottom:0!important;
+    height:80dvh!important;border-radius:16px 16px 0 0!important}
+
+  /* Kanban → scroll horizontal */
+  .kanban{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
+  .kboard{min-width:260px}
+
+  /* Buttons touch targets */
+  .btn{min-height:40px;padding:8px 14px}
+  .btn.sm{min-height:34px;padding:5px 10px}
+
+  /* Sidebar footer */
+  .sb-foot{padding-bottom:env(safe-area-inset-bottom,8px)}
+
+  /* Dashboard Direction */
+  div[style*="height:100%;display:flex;flex-direction:column"]{
+    height:auto!important;overflow:visible!important
+  }
+
+  /* CPM detail tabs → scroll */
+  div[style*="display:flex;gap:2px;flex-wrap:wrap;border-bottom"]{
+    overflow-x:auto;flex-wrap:nowrap!important;
+    -webkit-overflow-scrolling:touch;padding-bottom:4px
+  }
+  .modal-tab{white-space:nowrap;flex-shrink:0}
+
+  /* page-sub font */
+  .page-sub{font-size:12px}
+  .page-title{font-size:18px}
+
+  /* Cards padding */
+  .card{padding:12px}
+
+  /* Table in cards → smaller */
+  .card table{font-size:12px}
+
+  /* Action buttons in table → icon only hint */
+  .btn.sm[title]{font-size:13px}
+  
+  /* Pagination */
+  .tbl-foot{flex-direction:column;gap:6px;align-items:flex-start}
+  
+  /* Import uploader */
+  .uploader{padding:20px}
+}
+
+@media(max-width:420px){
+  /* Extra small phones */
+  .flt-bar input,.flt-bar select{width:100%!important}
+  div[style*="grid-template-columns:repeat(2,1fr)"],
+  .kpi-grid-4,.kpi-grid-8{grid-template-columns:1fr 1fr!important}
+  .page-title{font-size:16px}
+  #chatPanel{height:90dvh!important}
+}
 </style>
 </head>
 <body>
@@ -239,6 +358,8 @@ select option{background:var(--card)}
 </div>
 <div id="sidebar"></div>
 <div id="main"><div class="page" style="display:flex;align-items:center;justify-content:center;height:100%"><div class="spinner"></div> Chargement...</div></div>
+<button id="hamburger" aria-label="Menu">☰</button>
+<div id="sb-overlay"></div>
 <div id="mo-overlay"></div>
 
 <!-- User Form Overlay -->
@@ -3149,6 +3270,50 @@ const Chat = {
 
 // Init après le chargement de la page
 document.addEventListener('DOMContentLoaded', ()=>{ setTimeout(()=>Chat.init(), 500); });
+
+
+// ═══════════════════════════════════════════════
+// MOBILE — Hamburger + Sidebar
+// ═══════════════════════════════════════════════
+function isMobile(){ return window.innerWidth <= 768; }
+
+function openSidebar(){
+  document.getElementById('sidebar')?.classList.add('open');
+  document.getElementById('sb-overlay')?.classList.add('open');
+  document.getElementById('hamburger').textContent = '✕';
+}
+function closeSidebar(){
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sb-overlay')?.classList.remove('open');
+  document.getElementById('hamburger').textContent = '☰';
+}
+function toggleSidebar(){ 
+  document.getElementById('sidebar')?.classList.contains('open') ? closeSidebar() : openSidebar();
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('hamburger')?.addEventListener('click', toggleSidebar);
+  document.getElementById('sb-overlay')?.addEventListener('click', closeSidebar);
+
+  // Close sidebar on nav item click (mobile)
+  document.getElementById('sidebar')?.addEventListener('click', e=>{
+    if(isMobile() && e.target.dataset.page) setTimeout(closeSidebar, 100);
+  });
+
+  // Swipe to open/close sidebar
+  let touchStartX = 0, touchStartY = 0;
+  document.addEventListener('touchstart', e=>{
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, {passive:true});
+  document.addEventListener('touchend', e=>{
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+    if(dy > 60) return; // vertical swipe → ignore
+    if(dx > 60 && touchStartX < 30) openSidebar();  // swipe right from edge
+    if(dx < -60) closeSidebar();                      // swipe left to close
+  }, {passive:true});
+});
 
 
 </script>
