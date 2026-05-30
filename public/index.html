@@ -1446,10 +1446,10 @@ function ouvrirDebrief(ref_fibre, ref_segment, topo){
     document.getElementById('closeDebrief').onclick = () => mo.className='';
     mo.onclick = e => { if(e.target===mo) mo.className=''; };
 
-    // Bouton Nouvelle mesure → ouvre modal formulaire
+    // Bouton Nouvelle mesure → remplace le contenu du modal par le formulaire
     document.getElementById('btnNouvelleMesure')?.addEventListener('click',()=>{
-      ouvrirFormulaireDebrief(ref_fibre, ref_segment, topo, ()=>{
-        // Callback après enregistrement : rafraîchir l'historique
+      afficherFormulaireDebrief(mo, ref_fibre, ref_segment, topo, ()=>{
+        // Retour à l'historique après enregistrement ou fermeture
         loadMesuresFibre(ref_fibre).then(render);
       });
     });
@@ -1654,19 +1654,9 @@ function rebindDebrief(form, ref_fibre, ref_segment, topo){
 
 
 // ═══════════════════════════════════════════════
-// FORMULAIRE DÉBRIEF (modal séparé)
+// FORMULAIRE DÉBRIEF (dans le même modal)
 // ═══════════════════════════════════════════════
-function ouvrirFormulaireDebrief(ref_fibre, ref_segment, topo, onSaved){
-  // Create a second overlay div
-  let overlay2 = document.getElementById('mo-overlay-2');
-  if(!overlay2){
-    overlay2 = document.createElement('div');
-    overlay2.id = 'mo-overlay-2';
-    overlay2.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:520;display:flex;align-items:flex-end;justify-content:center;padding:0';
-    document.body.appendChild(overlay2);
-  }
-  overlay2.style.display = 'flex';
-
+function afficherFormulaireDebrief(mo, ref_fibre, ref_segment, topo, onBack){
   const form = {
     ref_fibre, ref_segment, topo,
     resultat: null, lien_conforme: null,
@@ -1676,65 +1666,63 @@ function ouvrirFormulaireDebrief(ref_fibre, ref_segment, topo, onSaved){
   };
 
   function renderForm(){
-    overlay2.innerHTML = `<div style="background:var(--card);border:1px solid var(--brd);border-radius:18px 18px 0 0;width:100%;max-width:620px;max-height:92dvh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.3)">
-      <div style="background:var(--acc);border-radius:18px 18px 0 0;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:1">
-        <div>
-          <div style="font-size:15px;font-weight:700;color:#fff">📡 Nouvelle mesure reflecto</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:1px;font-family:monospace">${esc(ref_fibre)}</div>
+    mo.querySelector('.modal').innerHTML = `
+      <div class="modal-hdr">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button id="backToHistory" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px" title="Retour">←</button>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#fff">📡 Nouvelle mesure reflecto</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.7);font-family:monospace">${esc(ref_fibre)}</div>
+          </div>
         </div>
-        <button id="closeForm2" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:10px;cursor:pointer;font-size:18px">✕</button>
+        <button id="closeFormDebrief" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">✕</button>
       </div>
-      <div style="padding:20px" id="debriefFormInner">
+      <div class="modal-body" id="debriefFormBody">
         ${renderDebriefStep(form)}
       </div>
-    </div>`;
+    `;
 
-    overlay2.onclick = e => { if(e.target===overlay2) closeForm2(); };
-    document.getElementById('closeForm2').onclick = closeForm2;
-    bindDebriefChoices2(form);
-    rebindDebrief2(form, ref_fibre, ref_segment, topo, onSaved);
+    // Retour à l'historique
+    document.getElementById('backToHistory').onclick = () => { if(onBack) onBack(); };
+    // Fermer complètement
+    document.getElementById('closeFormDebrief').onclick = () => { mo.className=''; };
+
+    bindDebriefFormChoices();
+    bindDebriefFormInputs();
   }
 
-  function closeForm2(){
-    overlay2.style.display = 'none';
-    overlay2.innerHTML = '';
-  }
-
-  // Override rebindDebrief to use inner form div
-  function bindDebriefChoices2(form){
-    overlay2.querySelectorAll('[data-debrief-choice]').forEach(btn=>{
+  function bindDebriefFormChoices(){
+    mo.querySelectorAll('[data-debrief-choice]').forEach(btn=>{
       const fresh = btn.cloneNode(true);
       btn.parentNode.replaceChild(fresh, btn);
       fresh.addEventListener('click',()=>{
         const [key,val] = fresh.dataset.debriefChoice.split(':');
         form[key] = val;
-        document.getElementById('debriefFormInner').innerHTML = renderDebriefStep(form);
-        bindDebriefChoices2(form);
-        rebindDebrief2(form, ref_fibre, ref_segment, topo, onSaved);
+        document.getElementById('debriefFormBody').innerHTML = renderDebriefStep(form);
+        bindDebriefFormChoices();
+        bindDebriefFormInputs();
       });
     });
   }
 
-  function rebindDebrief2(form, ref_fibre, ref_segment, topo, onSaved){
-    const i1310 = overlay2.querySelector('#db_att1310');
-    const i1550 = overlay2.querySelector('#db_att1550');
-    const ilong  = overlay2.querySelector('#db_longueur');
-    const idet   = overlay2.querySelector('#db_detail');
-    const irais  = overlay2.querySelector('#db_raison_autre');
+  function bindDebriefFormInputs(){
+    const q = id => mo.querySelector('#'+id);
+    const i1310 = q('db_att1310'), i1550 = q('db_att1550');
+    const ilong = q('db_longueur'), idet = q('db_detail'), irais = q('db_raison_autre');
     if(i1310) i1310.oninput = ()=>{ form.att_1310=i1310.value; };
     if(i1550) i1550.oninput = ()=>{ form.att_1550=i1550.value; };
     if(ilong) ilong.oninput = ()=>{ form.longueur_fo=ilong.value; };
     if(idet)  idet.oninput  = ()=>{ form.detail=idet.value; };
     if(irais) irais.oninput = ()=>{ form.raison_autre=irais.value; };
 
-    const submitBtn = overlay2.querySelector('#submitDebrief');
+    const submitBtn = mo.querySelector('#submitDebrief');
     if(submitBtn){
       submitBtn.onclick = async()=>{
-        if(form.raison_autre!==undefined) form.raison_autre = overlay2.querySelector('#db_raison_autre')?.value||'';
-        form.att_1310   = parseFloat(overlay2.querySelector('#db_att1310')?.value)||null;
-        form.att_1550   = parseFloat(overlay2.querySelector('#db_att1550')?.value)||null;
-        form.longueur_fo= parseFloat(overlay2.querySelector('#db_longueur')?.value)||null;
-        form.detail     = overlay2.querySelector('#db_detail')?.value||'';
+        form.raison_autre  = q('db_raison_autre')?.value||'';
+        form.att_1310      = parseFloat(q('db_att1310')?.value)||null;
+        form.att_1550      = parseFloat(q('db_att1550')?.value)||null;
+        form.longueur_fo   = parseFloat(q('db_longueur')?.value)||null;
+        form.detail        = q('db_detail')?.value||'';
         try{
           submitBtn.disabled=true; submitBtn.textContent='Enregistrement...';
           await api.post('/api/mesures-fibre',{
@@ -1751,13 +1739,11 @@ function ouvrirFormulaireDebrief(ref_fibre, ref_segment, topo, onSaved){
             user_nom:        S.currentUser?(S.currentUser.prenom+' '+S.currentUser.nom):'Inconnu',
           });
           notify('Mesure enregistrée ✓');
-          closeForm2();
           await loadMesuresFibre(ref_fibre);
-          if(onSaved) onSaved();
+          if(onBack) onBack(); // retour à l'historique
         }catch(e){
           notify('Erreur: '+e.message,'error');
-          submitBtn.disabled=false;
-          submitBtn.textContent='✓ Enregistrer';
+          submitBtn.disabled=false; submitBtn.textContent='✓ Enregistrer';
         }
       };
     }
@@ -1765,6 +1751,7 @@ function ouvrirFormulaireDebrief(ref_fibre, ref_segment, topo, onSaved){
 
   renderForm();
 }
+
 
 function renderSidebar(){
   const nav=getNav();
