@@ -195,119 +195,149 @@ select option{background:var(--card)}
    RESPONSIVE MOBILE
    ═══════════════════════════════════════════════ */
 
-/* Hamburger button */
-#hamburger{display:none;position:fixed;top:12px;left:12px;z-index:600;
-  width:42px;height:42px;border-radius:10px;background:var(--acc);border:none;
+/* Hamburger */
+#hamburger{
+  display:none;position:fixed;top:10px;left:10px;z-index:600;
+  width:44px;height:44px;border-radius:12px;background:var(--acc);border:none;
   color:#fff;font-size:20px;cursor:pointer;align-items:center;justify-content:center;
-  box-shadow:0 2px 12px rgba(124,58,237,.4)}
-#sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:499}
+  box-shadow:0 2px 12px rgba(124,58,237,.35);transition:transform .15s
+}
+#hamburger:active{transform:scale(.92)}
+#sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:499;backdrop-filter:blur(2px)}
 
+/* ── BREAKPOINT 768px ── */
 @media(max-width:768px){
-  /* Layout */
   #hamburger{display:flex}
-  #app{flex-direction:column}
+
+  /* App layout */
+  #app{flex-direction:column;height:100dvh}
   #sidebar{
-    position:fixed;left:-240px;top:0;bottom:0;width:240px;z-index:500;
-    transition:left .25s ease;overflow-y:auto
+    position:fixed;left:-260px;top:0;bottom:0;width:260px;z-index:500;
+    transition:left .28s cubic-bezier(.4,0,.2,1);
+    overflow-y:auto;overflow-x:hidden;
+    padding-bottom:env(safe-area-inset-bottom,0)
   }
-  #sidebar.open{left:0}
+  #sidebar.open{left:0;box-shadow:4px 0 24px rgba(0,0,0,.3)}
   #sb-overlay.open{display:block}
-  #main{padding-top:60px;width:100vw;overflow-x:hidden}
-
-  /* Page padding */
-  .page{padding:12px}
-  
-  /* Page header stack on mobile */
-  .page-hdr{flex-direction:column;align-items:flex-start;gap:8px}
-  .page-hdr > div:last-child{width:100%;display:flex;flex-wrap:wrap;gap:6px}
-  .page-hdr > div:last-child .btn{flex:1;min-width:0;text-align:center;justify-content:center}
-
-  /* KPI grids → 2 cols */
-  .kpi-grid-4,.kpi-grid-8,
-  div[style*="grid-template-columns:repeat(4,1fr)"],
-  div[style*="grid-template-columns:repeat(4, 1fr)"]{
-    grid-template-columns:repeat(2,1fr)!important
+  #main{
+    width:100%;padding-top:64px;
+    overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch
   }
+
+  /* Page */
+  .page{padding:12px 14px}
+  .page-title{font-size:18px}
+  .page-sub{font-size:12px}
+
+  /* Page header */
+  .page-hdr{
+    flex-direction:column;align-items:flex-start;gap:10px;
+    margin-bottom:12px
+  }
+  .page-hdr > div:last-child{
+    width:100%;display:flex;flex-wrap:wrap;gap:6px
+  }
+  .page-hdr .btn{
+    flex:1;min-width:120px;justify-content:center;
+    height:40px;font-size:13px
+  }
+
+  /* Cards */
+  .card{padding:12px 14px}
+
+  /* KPI grids */
+  .kpi-grid-4,.kpi-grid-8{grid-template-columns:1fr 1fr!important;gap:8px!important}
+
+  /* Hide tables on mobile — show card list instead */
+  .tbl-wrap{display:none}
+  .mobile-cards{display:flex;flex-direction:column;gap:8px}
+
+  /* Filter bar */
+  .flt-bar{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px
+  }
+  .flt-bar input[style*="width:200px"]{
+    grid-column:1/-1
+  }
+  .flt-bar select,.flt-bar input{width:100%!important}
+  .flt-bar .btn{grid-column:1/-1}
+
+  /* Modals full screen */
+  #mo-overlay{padding:0!important;align-items:flex-end!important}
+  #mo-overlay .modal{
+    width:100vw!important;max-width:100vw!important;
+    max-height:92dvh!important;border-radius:18px 18px 0 0!important;
+    overflow-y:auto
+  }
+  #userFormOverlay{padding:0!important;align-items:flex-end!important}
+  #userFormOverlay > div{
+    width:100vw!important;max-width:100vw!important;
+    border-radius:18px 18px 0 0!important;
+    max-height:92dvh!important;overflow-y:auto
+  }
+
+  /* Buttons */
+  .btn{min-height:40px;padding:8px 14px;font-size:13px}
+  .btn.sm{min-height:36px;padding:6px 10px;font-size:12px}
+  .pg-btn{min-height:36px;min-width:36px}
+
+  /* Chat */
+  #chatBtn{bottom:16px;right:16px;width:48px;height:48px}
+  #chatPanel{
+    width:100vw!important;right:0!important;bottom:0!important;
+    height:85dvh!important;border-radius:18px 18px 0 0!important
+  }
+
+  /* Kanban */
+  .kanban{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:10px;padding-bottom:8px}
+  .kboard{min-width:72vw;flex-shrink:0}
+
+  /* Tabs CPM scroll */
+  .modal-hdr + div,[class*="modal-tab"]{overflow-x:auto;flex-wrap:nowrap!important}
+  .modal-tab{flex-shrink:0;white-space:nowrap}
+
+  /* Dashboards stacked */
   div[style*="grid-template-columns:1fr 1fr 1fr"],
+  div[style*="grid-template-columns:220px 1fr 1fr"],
+  div[style*="grid-template-columns:210px 1fr 1fr"]{
+    grid-template-columns:1fr!important
+  }
+  div[style*="grid-template-columns:1fr 1fr"]{
+    grid-template-columns:1fr!important
+  }
   div[style*="grid-template-columns:repeat(3,1fr)"]{
     grid-template-columns:1fr 1fr!important
   }
-  div[style*="grid-template-columns:1fr 1fr"]:not(.keep-2col){
-    grid-template-columns:1fr!important
-  }
 
-  /* Tables → scrollable */
-  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{min-width:600px;font-size:13px}
-  th,td{padding:8px 10px!important;white-space:nowrap}
-
-  /* Modals → full screen */
-  #mo-overlay .modal,
-  #userFormOverlay > div{
-    max-width:100vw!important;width:100vw!important;
-    max-height:100dvh!important;height:100dvh!important;
-    border-radius:0!important;margin:0!important
-  }
-  #mo-overlay{padding:0!important;align-items:flex-start!important}
-
-  /* Filter bar → wrap */
-  .flt-bar{flex-wrap:wrap;gap:6px}
-  .flt-bar input,.flt-bar select{width:calc(50% - 4px)!important;min-width:120px}
-
-  /* Chat panel */
-  #chatPanel{width:100vw!important;right:0!important;bottom:0!important;
-    height:80dvh!important;border-radius:16px 16px 0 0!important}
-
-  /* Kanban → scroll horizontal */
-  .kanban{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
-  .kboard{min-width:260px}
-
-  /* Buttons touch targets */
-  .btn{min-height:40px;padding:8px 14px}
-  .btn.sm{min-height:34px;padding:5px 10px}
-
-  /* Sidebar footer */
-  .sb-foot{padding-bottom:env(safe-area-inset-bottom,8px)}
-
-  /* Dashboard Direction */
-  div[style*="height:100%;display:flex;flex-direction:column"]{
+  /* Dashboard Direction — no fixed height */
+  div[style*="height:100%;display:flex;flex-direction:column"],
+  div[style*="height:calc(100vh"]{
     height:auto!important;overflow:visible!important
   }
+  /* Charts fixed height on mobile */
+  div[style*="height:260px"],div[style*="height:220px"]{height:200px!important}
 
-  /* CPM detail tabs → scroll */
-  div[style*="display:flex;gap:2px;flex-wrap:wrap;border-bottom"]{
-    overflow-x:auto;flex-wrap:nowrap!important;
-    -webkit-overflow-scrolling:touch;padding-bottom:4px
-  }
-  .modal-tab{white-space:nowrap;flex-shrink:0}
-
-  /* page-sub font */
-  .page-sub{font-size:12px}
-  .page-title{font-size:18px}
-
-  /* Cards padding */
-  .card{padding:12px}
-
-  /* Table in cards → smaller */
-  .card table{font-size:12px}
-
-  /* Action buttons in table → icon only hint */
-  .btn.sm[title]{font-size:13px}
-  
   /* Pagination */
-  .tbl-foot{flex-direction:column;gap:6px;align-items:flex-start}
-  
-  /* Import uploader */
-  .uploader{padding:20px}
+  .tbl-foot{flex-direction:column;gap:8px}
+
+  /* Sidebar nav items bigger */
+  .sb-btn{min-height:44px;font-size:14px;padding:10px 14px}
+  .sb-grp{font-size:11px;padding:10px 14px 4px}
 }
 
 @media(max-width:420px){
-  /* Extra small phones */
-  .flt-bar input,.flt-bar select{width:100%!important}
-  div[style*="grid-template-columns:repeat(2,1fr)"],
   .kpi-grid-4,.kpi-grid-8{grid-template-columns:1fr 1fr!important}
-  .page-title{font-size:16px}
-  #chatPanel{height:90dvh!important}
+  .flt-bar{grid-template-columns:1fr}
+  .flt-bar input[style*="width:200px"]{grid-column:1}
+}
+
+/* Desktop — hide mobile cards */
+@media(min-width:769px){
+  .mobile-cards{display:none!important}
+  .tbl-wrap{display:block}
 }
 </style>
 </head>
@@ -1920,6 +1950,30 @@ function pageBUS(){
           </tr>`).join('')}
         </tbody>
       </table></div>
+      <!-- Mobile card view -->
+      <div class="mobile-cards">
+        ${!paged.length
+          ?'<div style="text-align:center;padding:32px;color:var(--mut)">Aucun résultat</div>'
+          :paged.map((b,i)=>`<div class="card" style="padding:12px 14px;border-left:3px solid ${SC[b.etat]?.c||'var(--brd)'}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+              <span class="mono" style="color:var(--acc);font-weight:700;font-size:13px">${esc(b.id)}</span>
+              <span class="lot-badge">${b.lot}</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              ${sbadge(b.etat)} ${rbadge(b.risque)}
+            </div>
+            <div style="margin-bottom:8px">${pb(b.av)}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px;color:var(--sub);margin-bottom:10px">
+              <div><span style="color:var(--mut)">RR :</span> ${esc(b.rr||'–')}</div>
+              <div><span style="color:var(--mut)">Livraison :</span> ${b.liv||'–'}</div>
+              ${b.ext?`<div style="grid-column:1/-1"><span style="color:var(--mut)">Ext :</span> ${esc(b.ext)}</div>`:''}
+            </div>
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+              <button class="btn sm" data-edit-bus="${esc(b.id)}" onclick="event.stopPropagation()">✏️ Modifier</button>
+              <button class="btn sm" data-del-bus="${esc(b.id)}" onclick="event.stopPropagation()" style="color:#ef4444;border-color:rgba(239,68,68,.3)">🗑</button>
+            </div>
+          </div>`).join('')}
+      </div>
       ${tp>1?`<div class="tbl-foot">
         <span style="font-size:12px;color:var(--mut)">${flt.length} résultats · Page ${S.pg+1}/${tp}</span>
         <div style="display:flex;gap:3px">
@@ -2059,6 +2113,23 @@ function pageMesures(){
         </div></td>
       </tr>`;}).join('')}</tbody>
     </table></div></div>
+    <div class="mobile-cards">
+      \${filterMesures().map((m,i)=>{const tE=(m.ok+m.nok)?Math.round(m.nok/(m.ok+m.nok)*100):0;return \`<div class="card" style="margin-bottom:8px;padding:12px 14px;border-left:3px solid \${m.nok>0?'#ef4444':'var(--brd)'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span class="mono" style="color:var(--acc);font-weight:700;font-size:13px">\${esc(m.topo)}</span>
+          \${obadge(m.moe)}
+        </div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:10px">RR : \${esc(m.rr||'–')}</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-bottom:8px">
+          \${[['Total',m.nbT,'var(--text)'],['Mesurés',m.nbM,'#3b82f6'],['OK',m.ok,'#10b981'],['NOK',m.nok,m.nok>0?'#ef4444':'var(--mut)']].map(([l,v,c])=>\`<div style="background:var(--th);border-radius:7px;padding:6px 4px"><div style="font-size:16px;font-weight:700;color:\${c}">\${v}</div><div style="font-size:10px;color:var(--mut)">\${l}</div></div>\`).join('')}
+        </div>
+        <div style="margin-bottom:10px">\${pb(m.nbM,m.nbT,'#3b82f6')}</div>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button class="btn sm" data-edit-mes="\${m.id}">✏️ Modifier</button>
+          <button class="btn sm" data-del-mes="\${m.id}" style="color:#ef4444;border-color:rgba(239,68,68,.3)">🗑</button>
+        </div>
+      </div>\`;}).join('')}
+    </div>
   </div>`;
 }
 
@@ -2103,6 +2174,27 @@ function pageCDD(){
         </div></td>
       </tr>`).join('')}</tbody>
     </table></div></div>
+    <div class="mobile-cards">
+      \${filterCDD().map((c,i)=>\`<div class="card" style="margin-bottom:8px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span class="mono" style="color:var(--acc);font-weight:700;font-size:13px">\${esc(c.topo)}</span>
+          <span class="lot-badge">\${c.lot||'–'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:8px">\${c.ns||''}\${c.sc?' · '+c.sc:''}\${c.dept?' · '+c.dept:''}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:8px">
+          <div><span style="color:var(--mut)">RR : </span>\${esc(c.rr||'–')}</div>
+          <div><span style="color:var(--mut)">MAD : </span>\${c.mad||'–'}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--mut)">PFTO</span>\${obadge(c.pfto)}
+          <span style="font-size:11px;color:var(--mut);margin-left:8px">SIN3</span>\${obadge(c.sin3)}
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button class="btn sm" data-edit-cdd="\${c.id}">✏️ Modifier</button>
+          <button class="btn sm" data-del-cdd="\${c.id}" style="color:#ef4444;border-color:rgba(239,68,68,.3)">🗑</button>
+        </div>
+      </div>\`).join('')}
+    </div>
   </div>`;
 }
 
@@ -2135,6 +2227,22 @@ function pageEmpl(){
         </div></td>
       </tr>`).join('')}</tbody>
     </table></div></div>
+    <div class="mobile-cards">
+      \${filterEmpl().map((e,i)=>\`<div class="card" style="margin-bottom:8px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span class="mono" style="color:var(--acc);font-weight:700;font-size:13px">\${esc(e.topo)}</span>
+          <span class="lot-badge">\${e.lot||'–'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:10px">\${e.site||'–'}\${e.dept?' · Dept '+e.dept:''}\${e.rr?' · '+esc(e.rr):''}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+          \${[['Équipe',e.ep],['RDV',e.rdv],['Annexe B',e.aB],['Install.',e.inst],['Consuel',e.cons],['Annexe C',e.aC]].map(([l,v])=>\`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--th);border-radius:8px;padding:6px 4px"><span style="font-size:10px;color:var(--mut)">\${l}</span>\${obadge(v)}</div>\`).join('')}
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button class="btn sm" data-edit-empl="\${e.id}">✏️</button>
+          <button class="btn sm" data-del-empl="\${e.id}" style="color:#ef4444;border-color:rgba(239,68,68,.3)">🗑</button>
+        </div>
+      </div>\`).join('')}
+    </div>
   </div>`;
 }
 
