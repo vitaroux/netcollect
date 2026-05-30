@@ -1245,23 +1245,45 @@ function ouvrirDebrief(ref_fibre, ref_segment, topo){
       <div class="modal-body">
 
         ${mesures.length ? `
-        <!-- Historique compact -->
-        <div style="margin-bottom:16px;padding:10px 14px;background:var(--th);border-radius:10px;border:1px solid var(--brd)">
-          <div style="font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
-            ${mesures.length} mesure(s) précédente(s)
+        <!-- Historique mesures -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">
+            📋 Historique — ${mesures.length} mesure(s)
           </div>
-          ${mesures.slice(0,5).map((m,i)=>`
-          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;${i<mesures.length-1?'border-bottom:1px solid var(--brd)':''}">
-            <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${m.lien_conforme==='Oui'?'#10b981':m.resultat==='Non Fait'?'#94a3b8':'#ef4444'}"></div>
-            <div style="flex:1">
-              <span style="font-size:12px;font-weight:600;color:var(--text)">${esc(m.resultat||'–')}</span>
-              ${m.lien_conforme?`<span style="font-size:11px;color:var(--sub)"> · Lien ${esc(m.lien_conforme)}</span>`:''}
-              ${m.type_defaut?`<span style="font-size:11px;color:#ef4444"> · ${esc(m.type_defaut)}</span>`:''}
-              ${m.raison_non_fait?`<span style="font-size:11px;color:#94a3b8"> · ${esc(m.raison_non_fait)}</span>`:''}
-            </div>
-            <div style="font-size:10px;color:var(--mut)">${m.user_nom||''} · ${m.created_at?new Date(m.created_at).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):''}</div>
-            <button data-del-mf="${m.id}" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;opacity:.6" title="Supprimer">🗑</button>
-          </div>`).join('')}
+          ${mesures.map((m,i)=>{
+            const ok=m.lien_conforme==='Oui';
+            const nok=m.lien_conforme==='Non';
+            const nf=m.resultat==='Non Fait';
+            const col=ok?'#10b981':nok?'#ef4444':'#94a3b8';
+            const bg=ok?'rgba(16,185,129,.07)':nok?'rgba(239,68,68,.07)':'rgba(148,163,184,.06)';
+            const label=ok?'✓ OK':nok?'✗ NOK':nf?'Non fait':'–';
+            // Détail selon le type
+            let details='';
+            if(ok){
+              const parts=[];
+              if(m.att_1310!=null) parts.push('Att. 1310 : <strong>'+m.att_1310+' dB</strong>');
+              if(m.att_1550!=null) parts.push('Att. 1550 : <strong>'+m.att_1550+' dB</strong>');
+              if(m.longueur_fo!=null) parts.push('Longueur : <strong>'+m.longueur_fo+' m</strong>');
+              details=parts.join(' · ');
+            } else if(nok){
+              details='<strong>'+esc(m.type_defaut)+'</strong>'+(m.detail?' : '+esc(m.detail):'');
+            } else if(nf){
+              details='Raison : <strong>'+esc(m.raison_non_fait)+'</strong>'+(m.raison_autre?' — '+esc(m.raison_autre):'');
+            }
+            return `<div style="background:${bg};border:1px solid ${col}40;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${details?'6px':'0'}">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:13px;font-weight:700;color:${col}">${label}</span>
+                  <span style="font-size:12px;color:var(--sub)">${esc(m.resultat||'')}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="font-size:11px;color:var(--mut)">${esc(m.user_nom||'')} · ${m.created_at?new Date(m.created_at).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):''}</div>
+                  <button data-del-mf="${m.id}" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;opacity:.5;line-height:1" title="Supprimer">🗑</button>
+                </div>
+              </div>
+              ${details?`<div style="font-size:13px;color:var(--text)">${details}</div>`:''}
+            </div>`;
+          }).join('')}
         </div>` : ''}
 
         <!-- Formulaire débrief -->
@@ -2381,7 +2403,7 @@ function renderCPMDetail(topo){
     tabContent = buildTopoSchema(segs, hepoc, c);
   } else if(activeTab==='segments'){
     tabContent='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
-      +Object.entries(typeColors).map(function(e2){const n=segs.filter(function(s){return s.type===e2[0];}).length;return n?'<span class="badge" style="background:'+e2[1]+'18;color:'+e2[1]+';cursor:pointer;font-size:13px">'+esc(e2[0])+' ('+n+')</span>':'';}).join('')
+      +Object.entries(typeColors).map(function(e2){const n=segs.filter(function(s){return s.type===e2[0];}).length;return n?'<span class="badge" style="background:'+e2[1]+'18;color:'+e2[1]+';cursor:pointer;font-size:15px">'+esc(e2[0])+' ('+n+')</span>':'';}).join('')
       +'</div>'
       +'<div style="overflow-x:auto;max-height:65vh;overflow-y:auto">'
       +segs.map(function(s,i){
@@ -2391,29 +2413,29 @@ function renderCPMDetail(topo){
         return '<div style="border:1px solid var(--brd);border-radius:8px;margin-bottom:8px;overflow:hidden">'
           // Segment header row
           +'<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 80px 100px 100px;gap:8px;padding:8px 12px;background:'+rowBg+';align-items:center">'
-          +'<div><span class="mono" style="font-size:11px;color:var(--sub)">'+esc((s.ref_seg||'').slice(0,24))+'</span></div>'
-          +'<div><span class="badge" style="background:'+tc+'18;color:'+tc+';font-size:12px">'+esc(s.type||'')+'</span></div>'
-          +'<div style="font-size:12px;color:var(--sub)">'+esc(s.date_mesc||'')+'</div>'
-          +'<div style="font-size:12px;color:var(--sub)">'+esc(s.gtr||'')+'</div>'
-          +'<div style="font-weight:700;text-align:right;font-size:13px">'+((s.longueur||0).toLocaleString('fr-FR'))+'<span style="font-size:9px;color:var(--mut)"> m</span></div>'
-          +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:11px">'+esc(s.ext_a||'')+'</span></div>'
-          +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:11px">'+esc(s.ext_b||'')+'</span></div>'
+          +'<div><span class="mono" style="font-size:13px;color:var(--sub)">'+esc((s.ref_seg||'').slice(0,24))+'</span></div>'
+          +'<div><span class="badge" style="background:'+tc+'18;color:'+tc+';font-size:14px">'+esc(s.type||'')+'</span></div>'
+          +'<div style="font-size:14px;color:var(--sub)">'+esc(s.date_mesc||'')+'</div>'
+          +'<div style="font-size:14px;color:var(--sub)">'+esc(s.gtr||'')+'</div>'
+          +'<div style="font-weight:700;text-align:right;font-size:15px">'+((s.longueur||0).toLocaleString('fr-FR'))+'<span style="font-size:11px;color:var(--mut)"> m</span></div>'
+          +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:13px">'+esc(s.ext_a||'')+'</span></div>'
+          +'<div><span class="mono" style="font-weight:600;color:var(--acc);font-size:13px">'+esc(s.ext_b||'')+'</span></div>'
           +'</div>'
           // Fibres sub-table — collapsible
           +(fibres.length
             ?'<div style="border-top:1px solid var(--brd)">'
-              +'<button class="fibre-toggle" data-seg="'+esc(s.ref_seg)+'" style="width:100%;padding:6px 12px;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--sub);font-size:11px;font-family:inherit;text-align:left">'
-              +'<span class="fibre-arrow" style="font-size:10px;transition:transform .2s">▶</span>'
+              +'<button class="fibre-toggle" data-seg="'+esc(s.ref_seg)+'" style="width:100%;padding:6px 12px;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--sub);font-size:13px;font-family:inherit;text-align:left">'
+              +'<span class="fibre-arrow" style="font-size:12px;transition:transform .2s">▶</span>'
               +'<span>'+fibres.length+' référence(s) fibre</span>'
               +'</button>'
               +'<div class="fibre-panel" data-seg="'+esc(s.ref_seg)+'" style="display:none;background:var(--inp);padding:4px 12px 8px">'
-              +'<table style="width:100%;font-size:13px">'
+              +'<table style="width:100%;font-size:15px">'
               +'<thead><tr>'
-              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:12px">Réf. fibre</th>'
-              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:12px">Site A</th>'
-              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:12px">PDL A</th>'
-              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:12px">PDL B</th>'
-              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:12px">Site B</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:14px">Réf. fibre</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:14px">Site A</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:14px">PDL A</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:14px">PDL B</th>'
+              +'<th style="text-align:left;padding:3px 6px;color:var(--mut);font-weight:600;font-size:14px">Site B</th>'
               +'</tr></thead><tbody>'
               +fibres.map(function(f,fi){
               const mfs=(MesuresCache[f.ref_fibre]||[]);
@@ -2430,15 +2452,15 @@ function renderCPMDetail(topo){
               return '<tr style="background:'+rowBg+';'+rowBorder+'">'
                 +'<td style="padding:3px 6px">'
                 +'<div style="display:flex;align-items:center;gap:5px">'
-                +'<span class="mono" style="font-size:12px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span>'
+                +'<span class="mono" style="font-size:14px;color:var(--sub)">'+esc((f.ref_fibre||'').slice(0,22))+'</span>'
                 +'</div></td>'
-                +'<td style="padding:4px 8px"><span class="mono" style="font-size:13px;color:var(--acc);font-weight:600">'+esc(f.code_a||'')+'</span></td>'
-                +'<td style="padding:4px 8px;font-family:monospace;font-size:13px;color:var(--text)">'+esc(f.pdl_a||'')+'</td>'
-                +'<td style="padding:4px 8px;font-family:monospace;font-size:13px;color:var(--text)">'+esc(f.pdl_b||'')+'</td>'
-                +'<td style="padding:4px 8px"><span class="mono" style="font-size:13px;color:var(--acc);font-weight:600">'+esc(f.code_b||'')+'</span></td>'
+                +'<td style="padding:4px 8px"><span class="mono" style="font-size:15px;color:var(--acc);font-weight:600">'+esc(f.code_a||'')+'</span></td>'
+                +'<td style="padding:4px 8px;font-family:monospace;font-size:15px;color:var(--text)">'+esc(f.pdl_a||'')+'</td>'
+                +'<td style="padding:4px 8px;font-family:monospace;font-size:15px;color:var(--text)">'+esc(f.pdl_b||'')+'</td>'
+                +'<td style="padding:4px 8px"><span class="mono" style="font-size:15px;color:var(--acc);font-weight:600">'+esc(f.code_b||'')+'</span></td>'
                 +'<td style="padding:3px 6px;text-align:right">'
-                +(statusLabel?'<span style="font-size:10px;font-weight:700;color:'+statusColor+';margin-right:6px">'+statusLabel+'</span>':'')
-                +'<button class="btn-debrief" data-ref-fibre="'+esc(f.ref_fibre)+'" data-ref-seg="'+esc(s.ref_seg)+'" data-topo="'+esc(c.topo)+'" style="padding:3px 9px;font-size:10px;border-radius:6px;border:1px solid var(--acc);background:var(--al);color:var(--acc);cursor:pointer;font-family:inherit;white-space:nowrap;font-size:12px">'
+                +(statusLabel?'<span style="font-size:12px;font-weight:700;color:'+statusColor+';margin-right:6px">'+statusLabel+'</span>':'')
+                +'<button class="btn-debrief" data-ref-fibre="'+esc(f.ref_fibre)+'" data-ref-seg="'+esc(s.ref_seg)+'" data-topo="'+esc(c.topo)+'" style="padding:3px 9px;font-size:12px;border-radius:6px;border:1px solid var(--acc);background:var(--al);color:var(--acc);cursor:pointer;font-family:inherit;white-space:nowrap;font-size:14px">'
                 +(mfCount>0?'📊 '+mfCount+' · + mesure':'📡 Déclarer')
                 +'</button>'
                 +'</td>'
@@ -2447,7 +2469,7 @@ function renderCPMDetail(topo){
               +'</tbody></table>'
               +'</div>'
               +'</div>'
-            :'<div style="padding:4px 12px;font-size:10px;color:var(--mut)">Aucune référence fibre</div>')
+            :'<div style="padding:4px 12px;font-size:12px;color:var(--mut)">Aucune référence fibre</div>')
           +'</div>';
       }).join('')
       +'</div>';
